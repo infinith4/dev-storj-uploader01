@@ -1,0 +1,4 @@
+[storj]
+type = storj
+access_grant = ""
+satellite_address = ""

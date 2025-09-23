@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rclone:*)",
+      "Bash(sudo bash:*)",
+      "Bash(winget install:*)",
+      "Bash(where choco)",
+      "Bash(powershell:*)",
+      "Bash(dir)",
+      "Bash(rclone-v1.71.0-windows-amd64/rclone.exe version:*)",
+      "Bash(rclone-v1.71.0-windows-amd64/rclone.exe backends:*)",
+      "Bash(rclone-v1.71.0-windows-amd64/rclone.exe help backends)",
+      "Bash(cp:*)",
+      "Bash(npm install:*)",
+      "Bash(docker:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(python test:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

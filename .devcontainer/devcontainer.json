@@ -1,0 +1,30 @@
+{
+  "name": "Storj Uploader Development",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {},
+    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-python.python",
+        "ms-python.pylint"
+      ]
+    }
+  },
+  "forwardPorts": [],
+  "mounts": [
+    "source=${localWorkspaceFolder}/upload_target,target=/app/upload_target,type=bind",
+    "source=${localWorkspaceFolder}/uploaded,target=/app/uploaded,type=bind"
+  ],
+  "postCreateCommand": "bash .devcontainer/setup.sh && chown -R vscode:vscode /home/vscode",
+  "remoteUser": "vscode",
+  "containerUser": "vscode"
+}

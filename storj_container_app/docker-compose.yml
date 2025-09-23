@@ -1,0 +1,11 @@
+services:
+  storj_container_app:
+    build: .
+    volumes:
+      - ./upload_target:/app/upload_target
+      - ./uploaded:/app/uploaded
+      - ./rclone.conf:/root/.config/rclone/rclone.conf:ro
+      - ./.env:/app/.env:ro
+    environment:
+      - STORJ_BUCKET_NAME=${STORJ_BUCKET_NAME:-my-storj-bucket}
+      - STORJ_REMOTE_NAME=${STORJ_REMOTE_NAME:-storj}
