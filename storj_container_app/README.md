@@ -46,6 +46,13 @@ cp ~/.config/rclone/rclone.conf ./rclone.conf
 
 ### Docker Composeを使用する場合（推奨）
 
+```bash
+docker compose down
+docker rmi storj_container_app-storj_container_app
+```
+
+
+
 1. アップロード対象ファイルを`upload_target`フォルダに配置
 
 2. コンテナを実行：

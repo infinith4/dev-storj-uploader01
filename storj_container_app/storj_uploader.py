@@ -8,6 +8,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 class StorjUploader:
     def __init__(self):
@@ -15,11 +17,15 @@ class StorjUploader:
         self.bucket_name = os.getenv('STORJ_BUCKET_NAME', 'default-bucket')
         self.remote_name = os.getenv('STORJ_REMOTE_NAME', 'storj')
         self.hash_length = int(os.getenv('HASH_LENGTH', '10'))
+        self.max_workers = int(os.getenv('MAX_WORKERS', '8'))
         self.upload_target_dir = Path('upload_target')
         self.uploaded_dir = Path('uploaded')
+        self.temp_dir = Path('temp_upload')
+        self.lock = threading.Lock()
 
         self.uploaded_dir.mkdir(exist_ok=True)
         self.upload_target_dir.mkdir(exist_ok=True)
+        self.temp_dir.mkdir(exist_ok=True)
 
     def run_rclone_command(self, command):
         try:
@@ -201,59 +207,132 @@ class StorjUploader:
         # Fallback to file system creation time
         return datetime.fromtimestamp(file_path.stat().st_ctime)
 
+    def _is_temp_hash_file(self, filename):
+        """
+        Check if filename appears to be a temporary hash file that should be ignored
+        """
+        # Pattern: filename with hash at the end (e.g., "filename_abcd1234.ext")
+        pattern = rf'.*_[a-f0-9]{{{self.hash_length}}}(\.|$)'
+        return bool(re.search(pattern, filename))
+
+    def upload_single_file(self, file_path):
+        """Upload a single file and return result"""
+        thread_id = threading.current_thread().name
+        try:
+            # Get file date (from filename or file system) and format as YYYYMM
+            file_date = self.get_file_date(file_path)
+            file_month = file_date.strftime("%Y%m")
+            remote_path = f"{self.remote_name}:{self.bucket_name}/{file_month}/"
+
+            with self.lock:
+                print(f"[{thread_id}] Uploading {file_path.name} to {remote_path}... (date: {file_date.strftime('%Y-%m-%d')})")
+
+            # Get unique filename and check for duplicates
+            unique_filename, has_suffix, should_skip, skip_reason = self.get_unique_filename(file_path, remote_path)
+
+            if should_skip:
+                with self.lock:
+                    print(f"[{thread_id}] Skipping '{file_path.name}': {skip_reason}")
+                    # Move skipped file to uploaded directory
+                    destination = self.uploaded_dir / file_path.name
+                    shutil.move(str(file_path), str(destination))
+                    print(f"[{thread_id}] Moved {file_path.name} to uploaded directory (skipped).")
+                return True, file_path, "skipped"
+
+            if has_suffix:
+                with self.lock:
+                    print(f"[{thread_id}] File '{file_path.name}' will be uploaded as '{unique_filename}'.")
+
+            # Upload with potentially renamed file
+            if has_suffix:
+                # Create thread-specific temporary directory
+                thread_temp_dir = self.temp_dir / thread_id
+                thread_temp_dir.mkdir(exist_ok=True)
+
+                # Create temporary file with new name in thread-specific directory
+                temp_file = thread_temp_dir / unique_filename
+                try:
+                    shutil.copy2(file_path, temp_file)
+                    command = f"rclone copy '{temp_file}' {remote_path}"
+                    success, output = self.run_rclone_command(command)
+                finally:
+                    # Ensure temporary file is always cleaned up
+                    if temp_file.exists():
+                        temp_file.unlink()
+                    # Clean up empty thread directory if possible
+                    try:
+                        thread_temp_dir.rmdir()
+                    except OSError:
+                        # Directory not empty or other issue, ignore
+                        pass
+            else:
+                command = f"rclone copy '{file_path}' {remote_path}"
+                success, output = self.run_rclone_command(command)
+
+            if success:
+                with self.lock:
+                    print(f"[{thread_id}] Successfully uploaded: {unique_filename}")
+                    # Move file to uploaded directory immediately after successful upload
+                    try:
+                        destination = self.uploaded_dir / file_path.name
+                        shutil.move(str(file_path), str(destination))
+                        print(f"[{thread_id}] Moved {file_path.name} to uploaded directory.")
+                    except Exception as e:
+                        print(f"[{thread_id}] Error moving {file_path.name}: {e}")
+                return True, file_path, "uploaded"
+            else:
+                with self.lock:
+                    print(f"[{thread_id}] Error uploading {file_path.name}: {output}")
+                return False, file_path, f"error: {output}"
+
+        except Exception as e:
+            with self.lock:
+                print(f"[{thread_id}] Exception uploading {file_path.name}: {e}")
+            return False, file_path, f"exception: {e}"
+
     def upload_files(self):
         if not self.upload_target_dir.exists() or not any(self.upload_target_dir.iterdir()):
             print("No files found in upload_target directory.")
             return True
 
-        uploaded_files = []
-        for file_path in self.upload_target_dir.iterdir():
-            if file_path.is_file():
-                # Get file date (from filename or file system) and format as YYYYMM
-                file_date = self.get_file_date(file_path)
-                file_month = file_date.strftime("%Y%m")
-                remote_path = f"{self.remote_name}:{self.bucket_name}/{file_month}/"
+        # Get all files to upload (exclude temporary hash files)
+        files_to_upload = [f for f in self.upload_target_dir.iterdir()
+                          if f.is_file() and not self._is_temp_hash_file(f.name)]
 
-                print(f"Uploading {file_path.name} to {remote_path}... (date: {file_date.strftime('%Y-%m-%d')})")
+        if not files_to_upload:
+            print("No files found in upload_target directory.")
+            return True
 
-                # Get unique filename and check for duplicates
-                unique_filename, has_suffix, should_skip, skip_reason = self.get_unique_filename(file_path, remote_path)
+        print(f"Starting upload of {len(files_to_upload)} files with {self.max_workers} workers...")
 
-                if should_skip:
-                    print(f"Skipping '{file_path.name}': {skip_reason}")
-                    # Move skipped file to uploaded directory
-                    destination = self.uploaded_dir / file_path.name
-                    shutil.move(str(file_path), str(destination))
-                    print(f"Moved {file_path.name} to uploaded directory (skipped).")
-                    continue
+        uploaded_count = 0
+        failed_uploads = []
 
-                if has_suffix:
-                    print(f"File '{file_path.name}' will be uploaded as '{unique_filename}'.")
+        # Use ThreadPoolExecutor for parallel uploads
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit all upload tasks
+            future_to_file = {executor.submit(self.upload_single_file, file_path): file_path
+                             for file_path in files_to_upload}
 
-                # Upload with potentially renamed file
-                if has_suffix:
-                    # Create temporary file with new name
-                    temp_file = file_path.parent / unique_filename
-                    shutil.copy2(file_path, temp_file)
-                    command = f"rclone copy '{temp_file}' {remote_path}"
-                    success, output = self.run_rclone_command(command)
-                    # Clean up temporary file
-                    temp_file.unlink()
-                else:
-                    command = f"rclone copy '{file_path}' {remote_path}"
-                    success, output = self.run_rclone_command(command)
+            # Process completed uploads
+            for future in as_completed(future_to_file):
+                success, file_path, status = future.result()
 
-                if success:
-                    print(f"Successfully uploaded: {unique_filename}")
-                    uploaded_files.append(file_path)
-                else:
-                    print(f"Error uploading {file_path.name}: {output}")
-                    return False
+                if success and status == "uploaded":
+                    uploaded_count += 1
+                elif not success:
+                    failed_uploads.append((file_path, status))
 
-        for file_path in uploaded_files:
-            destination = self.uploaded_dir / file_path.name
-            shutil.move(str(file_path), str(destination))
-            print(f"Moved {file_path.name} to uploaded directory.")
+        # Report results
+        print(f"\nUpload completed:")
+        print(f"  Successfully uploaded: {uploaded_count}")
+        print(f"  Failed uploads: {len(failed_uploads)}")
+
+        if failed_uploads:
+            print("Failed files:")
+            for file_path, reason in failed_uploads:
+                print(f"  - {file_path.name}: {reason}")
+            return False
 
         return True
 
