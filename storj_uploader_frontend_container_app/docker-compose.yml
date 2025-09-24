@@ -1,0 +1,29 @@
+services:
+  frontend:
+    build: .
+    ports:
+      - "9010:9010"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8010
+    depends_on:
+      - backend
+    networks:
+      - storj-network
+
+  backend:
+    build: ../storj_uploader_backend_api_container_app
+    ports:
+      - "8010:8010"
+    environment:
+      - UPLOAD_TARGET_DIR=../storj_container_app/upload_target
+      - TEMP_DIR=./temp
+      - MAX_FILE_SIZE=100000000
+    volumes:
+      - ../storj_container_app:/app/storj_container_app
+      - ./temp:/app/temp
+    networks:
+      - storj-network
+
+networks:
+  storj-network:
+    driver: bridge

@@ -1,0 +1,20 @@
+services:
+  storj-uploader-api:
+    build: .
+    ports:
+      - "8010:8010"
+    environment:
+      - UPLOAD_TARGET_DIR=../storj_container_app/upload_target
+      - TEMP_DIR=./temp
+      - MAX_FILE_SIZE=100000000
+    volumes:
+      - ./temp:/app/temp
+      - ../storj_container_app/upload_target:/app/upload_target
+      - .:/app
+    restart: unless-stopped
+    networks:
+      - storj-network
+
+networks:
+  storj-network:
+    driver: bridge
