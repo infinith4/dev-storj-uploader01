@@ -87,6 +87,7 @@ docker run -p 9010:80 storj-uploader-frontend
 
 ### Docker Compose（フロントエンド + バックエンド）
 ```bash
+cd /workspaces/dev-storj-uploader01/storj_uploader_frontend_container_app/
 docker compose down
 docker rmi storj_uploader_frontend_container_app-backend
 docker rmi storj_uploader_frontend_container_app-frontend

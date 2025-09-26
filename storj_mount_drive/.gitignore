@@ -1,0 +1,21 @@
+# Environment files
+.env
+
+# Virtual files directory (can be large)
+virtual_files/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Docker volumes
+.docker/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

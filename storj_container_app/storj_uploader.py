@@ -197,6 +197,7 @@ class StorjUploader:
     def get_file_date(self, file_path):
         """
         Get file date from filename first, fallback to file system date
+        Uses the older date between creation time and modification time
         Returns datetime object
         """
         # Try to extract date from filename first
@@ -204,8 +205,13 @@ class StorjUploader:
         if filename_date:
             return filename_date
 
-        # Fallback to file system creation time
-        return datetime.fromtimestamp(file_path.stat().st_ctime)
+        # Fallback to file system date: use the older of creation time and modification time
+        stat = file_path.stat()
+        creation_time = datetime.fromtimestamp(stat.st_ctime)
+        modification_time = datetime.fromtimestamp(stat.st_mtime)
+
+        # Return the older date
+        return min(creation_time, modification_time)
 
     def _is_temp_hash_file(self, filename):
         """

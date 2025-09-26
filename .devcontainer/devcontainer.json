@@ -15,15 +15,18 @@
       "extensions": [
         "golang.go",
         "ms-python.python",
-        "ms-python.pylint"
+        "ms-python.pylint",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "Anthropic.claude-code"
       ]
     }
   },
   "forwardPorts": [],
-  "mounts": [
-    "source=${localWorkspaceFolder}/upload_target,target=/app/upload_target,type=bind",
-    "source=${localWorkspaceFolder}/uploaded,target=/app/uploaded,type=bind"
-  ],
+  // "mounts": [
+  //   "source=${localWorkspaceFolder}/upload_target,target=/app/upload_target,type=bind",
+  //   "source=${localWorkspaceFolder}/uploaded,target=/app/uploaded,type=bind"
+  // ],
   "postCreateCommand": "bash .devcontainer/setup.sh && chown -R vscode:vscode /home/vscode",
   "remoteUser": "vscode",
   "containerUser": "vscode"

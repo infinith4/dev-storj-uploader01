@@ -1,0 +1,48 @@
+services:
+  file-organizer:
+    build: .
+    container_name: storj-file-organizer
+    volumes:
+      # Mount source files directory (where files to organize are placed)
+      - ./source_files:/app/source_files
+      # Mount organized files directory (where organized files will be stored)
+      - ./organized_files:/app/organized_files
+      # Mount storj virtual files for comparison
+      - ../storj_mount_drive/virtual_files:/app/virtual_files:ro
+      # Mount .env file from container app directory
+      - ../storj_container_app/.env:/app/.env:ro
+    working_dir: /app
+    command: tail -f /dev/null  # Keep container running
+    restart: unless-stopped
+
+  # Service for running organize command
+  file-organizer-run:
+    build: .
+    container_name: storj-file-organizer-run
+    volumes:
+      - ./source_files:/app/source_files
+      - ./organized_files:/app/organized_files
+      - ../storj_mount_drive/virtual_files:/app/virtual_files:ro
+      - ../storj_container_app/.env:/app/.env:ro
+    working_dir: /app
+    command: python file_organizer.py organize
+    depends_on:
+      - file-organizer
+    profiles:
+      - organize  # Only run when explicitly requested
+
+  # Service for running compare command
+  file-organizer-compare:
+    build: .
+    container_name: storj-file-organizer-compare
+    volumes:
+      - ./source_files:/app/source_files
+      - ./organized_files:/app/organized_files
+      - ../storj_mount_drive/virtual_files:/app/virtual_files:ro
+      - ../storj_container_app/.env:/app/.env:ro
+    working_dir: /app
+    command: python file_organizer.py compare
+    depends_on:
+      - file-organizer
+    profiles:
+      - compare  # Only run when explicitly requested

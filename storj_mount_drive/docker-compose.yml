@@ -1,0 +1,39 @@
+services:
+  storj-virtual-drive:
+    build: .
+    container_name: storj-virtual-drive
+    environment:
+      - STORJ_BUCKET_NAME=${STORJ_BUCKET_NAME:-prd-storj-uploader}
+      - STORJ_REMOTE_NAME=${STORJ_REMOTE_NAME:-storj}
+      - STORJ_ACCESS_GRANT=${STORJ_ACCESS_GRANT}
+      - STORJ_SATELLITE_ADDRESS=${STORJ_SATELLITE_ADDRESS}
+    volumes:
+      # Mount virtual_files directory to local host for access
+      - ./virtual_files:/app/virtual_files
+      # Mount rclone config from container app directory
+      - ../storj_container_app/rclone.conf:/app/config/rclone.conf:ro
+      # Mount .env file from container app directory
+      - ../storj_container_app/.env:/app/.env:ro
+    working_dir: /app
+    command: tail -f /dev/null  # Keep container running
+    restart: unless-stopped
+
+  # Service for running sync command
+  storj-sync:
+    build: .
+    container_name: storj-sync
+    environment:
+      - STORJ_BUCKET_NAME=${STORJ_BUCKET_NAME:-prd-storj-uploader}
+      - STORJ_REMOTE_NAME=${STORJ_REMOTE_NAME:-storj}
+      - STORJ_ACCESS_GRANT=${STORJ_ACCESS_GRANT}
+      - STORJ_SATELLITE_ADDRESS=${STORJ_SATELLITE_ADDRESS}
+    volumes:
+      - ./virtual_files:/app/virtual_files
+      - ../storj_container_app/rclone.conf:/app/config/rclone.conf:ro
+      - ../storj_container_app/.env:/app/.env:ro
+    working_dir: /app
+    command: python storj_virtual_drive.py sync
+    depends_on:
+      - storj-virtual-drive
+    profiles:
+      - sync  # Only run when explicitly requested

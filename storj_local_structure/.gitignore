@@ -1,0 +1,22 @@
+# Environment files
+.env
+
+# Source and organized files directories (can be large)
+source_files/
+organized_files/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Docker volumes
+.docker/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

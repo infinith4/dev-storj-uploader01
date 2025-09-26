@@ -47,6 +47,7 @@ cp ~/.config/rclone/rclone.conf ./rclone.conf
 ### Docker Composeを使用する場合（推奨）
 
 ```bash
+cd storj_container_app/
 docker compose down
 docker rmi storj_container_app-storj_container_app
 ```
@@ -58,7 +59,7 @@ docker rmi storj_container_app-storj_container_app
 2. コンテナを実行：
 
 ```bash
-docker-compose up
+docker-compose up --build
 ```
 
 ### Dockerを直接使用する場合
