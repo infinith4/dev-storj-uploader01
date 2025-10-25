@@ -2,32 +2,58 @@
   "name": "Storj Uploader Development",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
-    "ghcr.io/devcontainers/features/go:1": {},
-    "ghcr.io/devcontainers/features/python:1": {},
-    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/aws-cli:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/git:1": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        "golang.go",
         "ms-python.python",
         "ms-python.pylint",
-        "ms-azuretools.vscode-containers",
-        "ms-azuretools.vscode-docker",
-        "Anthropic.claude-code"
-      ]
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-typescript-next"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        }
+      }
     }
   },
-  "forwardPorts": [],
-  // "mounts": [
-  //   "source=${localWorkspaceFolder}/upload_target,target=/app/upload_target,type=bind",
-  //   "source=${localWorkspaceFolder}/uploaded,target=/app/uploaded,type=bind"
-  // ],
-  "postCreateCommand": "bash .devcontainer/setup.sh && chown -R vscode:vscode /home/vscode",
+  "forwardPorts": [8010, 9010, 3000],
+  "portsAttributes": {
+    "8010": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    },
+    "9010": {
+      "label": "Frontend (Production)",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Frontend (Development)",
+      "onAutoForward": "notify"
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/storj_container_app/upload_target,target=${containerWorkspaceFolder}/storj_container_app/upload_target,type=bind",
+    "source=${localWorkspaceFolder}/storj_container_app/uploaded,target=${containerWorkspaceFolder}/storj_container_app/uploaded,type=bind"
+  ],
+  "postCreateCommand": "bash .devcontainer/setup.sh",
   "remoteUser": "vscode",
-  "containerUser": "vscode"
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
 }

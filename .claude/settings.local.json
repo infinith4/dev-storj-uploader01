@@ -15,6 +15,7 @@
       "Bash(docker:*)",
       "Bash(sudo chmod:*)",
       "Bash(python test:*)",
+<<<<<<< HEAD
       "Bash(python:*)",
       "Bash(pip install:*)",
       "Bash(apt:*)",
@@ -28,6 +29,9 @@
       "Bash(docker-compose restart:*)",
       "Bash(docker-compose:*)",
       "Bash(xargs -I {} cp \"../storj_container_app/upload_target/{}\" source_files/)"
+=======
+      "Bash(cat:*)"
+>>>>>>> 859c2c0707817fd212e07c3c60d983f94331b56f
     ],
     "deny": [],
     "ask": []

@@ -1,8 +1,9 @@
-upload_target
-uploaded
+!upload_target/.gitkeep
+!uploaded/.gitkeep
 *.mp4
 *.jpg
 *.png
+*.mov
 rclone.conf
 .env
 *.bak
