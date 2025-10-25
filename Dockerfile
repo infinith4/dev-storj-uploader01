@@ -7,6 +7,6 @@ RUN apt-get update \
         unzip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p upload_target uploaded
+RUN mkdir -p ./storj_container_app/upload_target ./storj_container_app/uploaded
 
 RUN chmod +x ./devcontainer/setup.sh

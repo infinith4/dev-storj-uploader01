@@ -14,7 +14,8 @@
       "Bash(npm install:*)",
       "Bash(docker:*)",
       "Bash(sudo chmod:*)",
-      "Bash(python test:*)"
+      "Bash(python test:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
