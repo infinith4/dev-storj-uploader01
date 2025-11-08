@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MyApp"
+rootProject.name = "StorjApp"
 include ':app'

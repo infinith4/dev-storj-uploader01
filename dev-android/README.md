@@ -1,9 +1,13 @@
-# MyApp - Android Template
+# Storj Photo Uploader - Android App
 
-シンプルなAndroidアプリのテンプレートです。GitHub Actionsによる自動ビルド・リリースに対応しています。
+スマートフォンの写真を自動的にStorjにアップロードするAndroidアプリです。GitHub Actionsによる自動ビルド・リリースに対応しています。
 
 ## 機能
 
+- ✅ **写真の自動アップロード** - バックグラウンドで15分ごとに新しい写真を自動アップロード
+- ✅ **手動アップロード** - ボタンをタップして即座に写真をアップロード
+- ✅ **Bearer Token認証** - セキュアなAPI認証
+- ✅ **Storj Backend API連携** - `storj_uploader_backend_api_container_app` と連携
 - ✅ Kotlinベースの基本的なAndroidアプリ
 - ✅ Material Designテーマ
 - ✅ GitHub Actions CI/CD
@@ -60,19 +64,67 @@ adb shell am start -n com.example.myapp/.MainActivity
 ./gradlew installDebug && adb shell am start -n com.example.myapp/.MainActivity
 ```
 
+## アプリの使い方
+
+### 初期設定
+
+1. **Backend APIの起動**
+   ```bash
+   cd ../dev-storj-uploader01/storj_uploader_backend_api_container_app
+   docker-compose up --build
+   ```
+   APIは `http://localhost:8010` で起動します。
+
+2. **アプリのインストール**
+   - エミュレータまたは実機にアプリをインストール
+   ```bash
+   ./gradlew installDebug
+   ```
+
+3. **Bearer Tokenの設定**
+   - アプリを起動
+   - Bearer Token入力欄にAPIトークンを入力
+   - 「Save Token」ボタンをタップ
+   - 写真アクセス権限の許可を求められたら「許可」をタップ
+
+### 自動アップロード
+
+- Tokenを保存すると自動的にバックグラウンドアップロードが有効になります
+- 15分ごとに過去24時間以内に追加された写真が自動的にアップロードされます
+- ネットワークに接続されている場合のみ動作します
+
+### 手動アップロード
+
+- 「Upload Photos Now」ボタンをタップすると、即座に写真のアップロードが開始されます
+- 過去24時間以内に追加された写真がアップロードされます
+
+### 注意事項
+
+- エミュレータでテストする場合、APIのURLは `http://10.0.2.2:8010` に設定されています（エミュレータから localhost にアクセスするための特別なIP）
+- 実機でテストする場合は、`app/src/main/java/com/example/myapp/api/RetrofitClient.kt` の BASE_URL を実際のIPアドレスに変更してください
+
 ## プロジェクト構成
 
-- `app/src/main/java/` - Kotlinソースコード
+- `app/src/main/java/com/example/myapp/` - Kotlinソースコード
+  - `MainActivity.kt` - メインアクティビティ
+  - `api/` - API関連クラス（Retrofit, APIサービス）
+  - `model/` - データモデル（レスポンス、リクエスト）
+  - `repository/` - データ操作（写真取得、アップロード）
+  - `worker/` - バックグラウンドタスク（WorkManager）
 - `app/src/main/res/` - リソースファイル（レイアウト、文字列、色など）
 - `app/src/main/AndroidManifest.xml` - アプリのマニフェストファイル
 - `app/build.gradle` - アプリモジュールのビルド設定
 - `build.gradle` - プロジェクトレベルのビルド設定
 
-## 機能
+## 技術スタック
 
-- Kotlin を使用した基本的なActivity
-- ConstraintLayoutを使った簡単なUI
-- Material Designテーマ
+- **言語**: Kotlin
+- **UIフレームワーク**: Android Views (Material Design Components)
+- **HTTPクライアント**: Retrofit + OkHttp
+- **JSONパーサー**: Gson
+- **非同期処理**: Kotlin Coroutines
+- **バックグラウンド処理**: WorkManager
+- **アーキテクチャ**: Repository Pattern
 
 ## GitHub Actions CI/CD
 
