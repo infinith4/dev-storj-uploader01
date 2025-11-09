@@ -25,6 +25,33 @@ cd storj_mount_drive/
 docker-compose up -d
 ```
 
+## Flutter SDK の使用
+
+Dev Container 環境では Flutter SDK がインストールされています。
+
+```bash
+# Flutter のバージョン確認
+flutter --version
+
+# Flutter プロジェクトの依存関係を取得
+flutter pub get
+
+# 新規 Flutter プロジェクトを作成
+flutter create my_app
+
+# Flutter アプリを実行
+flutter run
+```
+
+**注意**: 新しいターミナルを開いた際に `flutter` コマンドが見つからない場合は、以下を実行してください：
+
+```bash
+export PATH="$HOME/flutter/bin:$PATH"
+```
+
+---
+
+## Claude Code 自動承認設定
 
 # ファイル作成のみ自動承認
 claude code config set auto-approve-create true

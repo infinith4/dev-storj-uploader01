@@ -18,6 +18,30 @@ curl https://rclone.org/install.sh | sudo bash
 # Verify rclone installation
 rclone version
 
+# Install Flutter SDK
+echo "Installing Flutter SDK..."
+if [ ! -d "$HOME/flutter" ]; then
+    cd ~
+    git clone https://github.com/flutter/flutter.git -b stable
+    cd -
+fi
+
+# Add Flutter to PATH permanently
+if ! grep -q 'flutter/bin' ~/.bashrc; then
+    echo 'export PATH="$HOME/flutter/bin:$PATH"' >> ~/.bashrc
+    echo "Added Flutter to PATH in ~/.bashrc"
+fi
+
+# Export Flutter PATH for this session
+export PATH="$HOME/flutter/bin:$PATH"
+
+# Precache Flutter
+echo "Precaching Flutter..."
+flutter precache
+
+# Verify Flutter installation
+flutter --version
+
 # Create necessary directories
 echo "Creating necessary directories..."
 mkdir -p storj_container_app/upload_target
