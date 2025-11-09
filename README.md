@@ -18,9 +18,11 @@ Androidモバイルアプリは `dev-android` フォルダに配置されてい�
 - アップロード履歴の表示
 - バックグラウンドでの自動アップロード
 
-### ビルド方法
+### ドキュメント
 
-詳細は [dev-android/README.md](dev-android/README.md) と [dev-android/RELEASE.md](dev-android/RELEASE.md) を参照してください。
+- [dev-android/README.md](dev-android/README.md) - ビルド方法と使い方
+- [dev-android/SCREEN_DESIGN.md](dev-android/SCREEN_DESIGN.md) - 画面設計書・画面遷移図
+- [dev-android/RELEASE.md](dev-android/RELEASE.md) - リリースビルド手順
 
 #### GitHub Actionsでの自動ビルド
 
