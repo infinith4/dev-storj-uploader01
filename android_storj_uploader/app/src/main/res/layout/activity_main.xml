@@ -99,7 +99,7 @@
         android:layout_height="2dp"
         android:background="@android:color/darker_gray" />
 
-    <!-- Lower section (3/4 of screen) - Upload History -->
+    <!-- Lower section (3/4 of screen) - Photo Gallery -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -110,7 +110,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Upload History"
+            android:text="Photos"
             android:textSize="18sp"
             android:textStyle="bold"
             android:padding="16dp"
@@ -122,7 +122,7 @@
             android:layout_height="match_parent">
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/uploadHistoryRecyclerView"
+                android:id="@+id/photoGalleryRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"

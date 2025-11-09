@@ -58,6 +58,8 @@ class PhotoUploadWorker(
                 val result = photoRepository.uploadPhotos(batch, bearerToken)
 
                 if (result.isSuccess) {
+                    // Mark photos as uploaded
+                    photoRepository.markPhotosAsUploaded(batch)
                     successCount += batch.size
                     Log.d(TAG, "Batch ${index + 1} uploaded successfully")
                 } else {

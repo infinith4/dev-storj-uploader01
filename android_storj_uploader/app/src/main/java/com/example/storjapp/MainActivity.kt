@@ -22,14 +22,10 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.*
 import androidx.work.OneTimeWorkRequestBuilder
-import com.example.storjapp.adapter.UploadHistoryAdapter
-import com.example.storjapp.model.UploadHistoryItem
-import com.example.storjapp.model.UploadStatus
+import com.example.storjapp.adapter.PhotoGalleryAdapter
 import com.example.storjapp.repository.PhotoRepository
 import com.example.storjapp.worker.PhotoUploadWorker
 import com.google.android.material.textfield.TextInputEditText
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -39,7 +35,6 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "MainActivity"
         private const val PREFS_NAME = "StorjUploaderPrefs"
         private const val KEY_BEARER_TOKEN = "bearer_token"
-        private const val KEY_UPLOAD_HISTORY = "upload_history"
     }
 
     private lateinit var tokenInput: TextInputEditText
@@ -48,12 +43,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var uploadProgressBar: ProgressBar
     private lateinit var progressText: TextView
-    private lateinit var uploadHistoryRecyclerView: RecyclerView
+    private lateinit var photoGalleryRecyclerView: RecyclerView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var prefs: SharedPreferences
     private lateinit var photoRepository: PhotoRepository
-    private lateinit var historyAdapter: UploadHistoryAdapter
-    private val gson = Gson()
+    private lateinit var galleryAdapter: PhotoGalleryAdapter
     private var permissionChecked = false
 
     // Permission launcher
@@ -86,7 +80,7 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         uploadProgressBar = findViewById(R.id.uploadProgressBar)
         progressText = findViewById(R.id.progressText)
-        uploadHistoryRecyclerView = findViewById(R.id.uploadHistoryRecyclerView)
+        photoGalleryRecyclerView = findViewById(R.id.photoGalleryRecyclerView)
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
 
         // Set title with commit version (with error handling)
@@ -109,21 +103,21 @@ class MainActivity : AppCompatActivity() {
         photoRepository = PhotoRepository(this)
 
         // Setup RecyclerView
-        historyAdapter = UploadHistoryAdapter()
-        uploadHistoryRecyclerView.apply {
+        galleryAdapter = PhotoGalleryAdapter()
+        photoGalleryRecyclerView.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = historyAdapter
+            adapter = galleryAdapter
         }
 
-        // Load upload history asynchronously
+        // Load all photos asynchronously
         lifecycleScope.launch {
-            loadUploadHistory()
+            loadAllPhotos()
         }
 
         // Setup SwipeRefreshLayout
         swipeRefreshLayout.setOnRefreshListener {
             lifecycleScope.launch {
-                loadUploadHistory()
+                loadAllPhotos()
                 swipeRefreshLayout.isRefreshing = false
             }
         }
@@ -271,37 +265,17 @@ class MainActivity : AppCompatActivity() {
                 val batchSize = 5
                 val batches = recentPhotos.chunked(batchSize)
                 var uploadedCount = 0
+                var failureCount = 0
 
                 for ((index, batch) in batches.withIndex()) {
                     val result = photoRepository.uploadPhotos(batch, token)
 
                     if (result.isSuccess) {
-                        // Add to history
-                        batch.forEach { uri ->
-                            val fileName = uri.lastPathSegment ?: "unknown.jpg"
-                            val historyItem = UploadHistoryItem(
-                                id = System.currentTimeMillis(),
-                                photoUri = uri.toString(),
-                                fileName = fileName,
-                                uploadTime = System.currentTimeMillis(),
-                                status = UploadStatus.SUCCESS
-                            )
-                            addToUploadHistory(historyItem)
-                        }
+                        // Mark photos as uploaded
+                        photoRepository.markPhotosAsUploaded(batch)
                         uploadedCount += batch.size
                     } else {
-                        // Mark as failed in history
-                        batch.forEach { uri ->
-                            val fileName = uri.lastPathSegment ?: "unknown.jpg"
-                            val historyItem = UploadHistoryItem(
-                                id = System.currentTimeMillis(),
-                                photoUri = uri.toString(),
-                                fileName = fileName,
-                                uploadTime = System.currentTimeMillis(),
-                                status = UploadStatus.FAILED
-                            )
-                            addToUploadHistory(historyItem)
-                        }
+                        failureCount += batch.size
                     }
 
                     // Update progress
@@ -317,6 +291,8 @@ class MainActivity : AppCompatActivity() {
                         "Uploaded $uploadedCount of $totalPhotos photos",
                         Toast.LENGTH_SHORT
                     ).show()
+                    // Reload photo gallery to reflect upload status
+                    loadAllPhotos()
                 } else {
                     updateStatus("Upload failed")
                     Toast.makeText(
@@ -361,52 +337,13 @@ class MainActivity : AppCompatActivity() {
         progressText.text = "$uploaded / $total photos uploaded"
     }
 
-    private fun loadUploadHistory() {
-        val historyJson = prefs.getString(KEY_UPLOAD_HISTORY, null)
-        if (historyJson != null) {
-            try {
-                val type = object : TypeToken<List<UploadHistoryItem>>() {}.type
-                val history: List<UploadHistoryItem> = gson.fromJson(historyJson, type)
-                historyAdapter.updateItems(history)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading upload history", e)
-            }
-        }
-    }
-
-    private fun saveUploadHistory(history: List<UploadHistoryItem>) {
+    private suspend fun loadAllPhotos() {
         try {
-            val historyJson = gson.toJson(history)
-            prefs.edit().putString(KEY_UPLOAD_HISTORY, historyJson).apply()
+            val photos = photoRepository.getAllPhotosWithStatus()
+            galleryAdapter.updateItems(photos)
+            Log.d(TAG, "Loaded ${photos.size} photos")
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving upload history", e)
+            Log.e(TAG, "Error loading photos", e)
         }
-    }
-
-    private fun addToUploadHistory(item: UploadHistoryItem) {
-        // Load current history
-        val historyJson = prefs.getString(KEY_UPLOAD_HISTORY, null)
-        val history = if (historyJson != null) {
-            try {
-                val type = object : TypeToken<MutableList<UploadHistoryItem>>() {}.type
-                gson.fromJson<MutableList<UploadHistoryItem>>(historyJson, type)
-            } catch (e: Exception) {
-                mutableListOf()
-            }
-        } else {
-            mutableListOf()
-        }
-
-        // Add new item at beginning
-        history.add(0, item)
-
-        // Keep only last 100 items
-        if (history.size > 100) {
-            history.subList(100, history.size).clear()
-        }
-
-        // Save and update UI
-        saveUploadHistory(history)
-        historyAdapter.addItem(item)
     }
 }
