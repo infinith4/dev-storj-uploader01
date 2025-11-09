@@ -1,4 +1,47 @@
-Frontend, Backend 起動
+# Storj Uploader Project
+
+このプロジェクトは、Storjクラウドストレージへのファイルアップロードシステムです。
+
+## プロジェクト構成
+
+- **storj_uploader_frontend_container_app** - React + TypeScript フロントエンド
+- **storj_uploader_backend_api_container_app** - FastAPI バックエンドAPI
+- **storj_container_app** - rcloneベースのコアアップローダー
+- **dev-android** - Android モバイルアプリ (Kotlin)
+
+## Android アプリ
+
+Androidモバイルアプリは `dev-android` フォルダに配置されています。
+
+### 機能
+- Storj APIへの写真・動画アップロード
+- アップロード履歴の表示
+- バックグラウンドでの自動アップロード
+
+### ビルド方法
+
+詳細は [dev-android/README.md](dev-android/README.md) と [dev-android/RELEASE.md](dev-android/RELEASE.md) を参照してください。
+
+#### GitHub Actionsでの自動ビルド
+
+プッシュまたはPRで自動的にビルドが実行されます：
+- ✅ デバッグAPKのビルド
+- ✅ ユニットテストの実行
+- ✅ Lintチェック
+- ✅ アーティファクトのアップロード
+
+#### リリースビルド
+
+バージョンタグをプッシュすると、署名付きリリースAPKが自動生成されます：
+
+```bash
+git tag v1.0
+git push origin --tags
+```
+
+詳細な手順は [dev-android/RELEASE.md](dev-android/RELEASE.md) を参照してください。
+
+## Frontend, Backend 起動
 
 ```bash
 cd /workspaces/dev-storj-uploader01/storj_uploader_frontend_container_app/
