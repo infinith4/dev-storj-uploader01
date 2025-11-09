@@ -62,7 +62,7 @@
             android:text="Status: Not configured"
             android:textSize="14sp"
             android:gravity="center"
-            android:layout_marginTop="8dp" />
+            android:layout_marginTop="38dp" />
 
         <ProgressBar
             android:id="@+id/uploadProgressBar"

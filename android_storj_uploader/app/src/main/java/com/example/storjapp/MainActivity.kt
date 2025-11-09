@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.*
+import androidx.work.OneTimeWorkRequestBuilder
 import com.example.storjapp.adapter.UploadHistoryAdapter
 import com.example.storjapp.model.UploadHistoryItem
 import com.example.storjapp.model.UploadStatus
@@ -223,7 +224,15 @@ class MainActivity : AppCompatActivity() {
             uploadWorkRequest
         )
 
-        Log.d(TAG, "Auto-upload scheduled")
+        // Schedule an immediate one-time upload to test the setup
+        val immediateUploadRequest = OneTimeWorkRequestBuilder<PhotoUploadWorker>()
+            .setConstraints(constraints)
+            .setInitialDelay(30, TimeUnit.SECONDS) // 30 seconds after setup
+            .build()
+
+        WorkManager.getInstance(this).enqueue(immediateUploadRequest)
+
+        Log.d(TAG, "Auto-upload scheduled (periodic + immediate)")
         updateStatus("Auto-upload active (every 15 min)")
     }
 
