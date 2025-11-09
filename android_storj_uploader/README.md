@@ -178,5 +178,6 @@ git push origin main --tags
 
 ## ドキュメント
 
+- [SCREEN_DESIGN.md](SCREEN_DESIGN.md) - 画面設計書・画面遷移図・UIフロー図
 - [RELEASE.md](RELEASE.md) - リリースビルドとデプロイの詳細ガイド
 - [.github/workflows/android-build.yml](.github/workflows/android-build.yml) - CI/CD設定

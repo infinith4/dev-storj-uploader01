@@ -2,13 +2,18 @@ package com.example.storjapp.api
 
 import com.example.storjapp.model.UploadResponse
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
+import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 
 interface StorjApiService {
+    @GET("/health")
+    suspend fun healthCheck(): Response<ResponseBody>
+
     @Multipart
     @POST("/upload/files")
     suspend fun uploadFiles(

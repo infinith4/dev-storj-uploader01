@@ -258,4 +258,23 @@ class PhotoRepository(private val context: Context) {
         prefs.edit().putString(KEY_UPLOADED_PHOTOS, currentUploaded.joinToString(",")).apply()
         Log.d(TAG, "Marked ${photoUris.size} photos as uploaded")
     }
+
+    /**
+     * Check API health
+     */
+    suspend fun checkApiHealth(): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val response = RetrofitClient.apiService.healthCheck()
+            if (response.isSuccessful) {
+                Log.d(TAG, "API health check: OK")
+                Result.success(true)
+            } else {
+                Log.w(TAG, "API health check failed: ${response.code()}")
+                Result.success(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "API health check error", e)
+            Result.success(false)
+        }
+    }
 }

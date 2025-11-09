@@ -15,7 +15,14 @@
       "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell am start -n com.example.storjapp.debug/com.example.storjapp.MainActivity)",
       "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d)",
       "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s AndroidRuntime:E)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell ps)"
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell ps)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -s MainActivity:D PhotoRepository:D -d)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -c)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -s MainActivity:D PhotoRepository:D)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell am force-stop com.example.storjapp.debug)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s PhotoRepository:D)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s PhotoRepository:D MainActivity:D PhotoUploadWorker:D)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s OkHttp)"
     ],
     "deny": [],
     "ask": []

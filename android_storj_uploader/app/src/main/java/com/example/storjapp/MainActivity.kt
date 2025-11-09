@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var saveTokenButton: Button
     private lateinit var uploadNowButton: Button
     private lateinit var statusText: TextView
+    private lateinit var healthCheckText: TextView
     private lateinit var uploadProgressBar: ProgressBar
     private lateinit var progressText: TextView
     private lateinit var photoGalleryRecyclerView: RecyclerView
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var photoRepository: PhotoRepository
     private lateinit var galleryAdapter: PhotoGalleryAdapter
     private var permissionChecked = false
+    private var healthCheckJob: kotlinx.coroutines.Job? = null
 
     // Permission launcher
     private val requestPermissionLauncher = registerForActivityResult(
@@ -78,6 +80,7 @@ class MainActivity : AppCompatActivity() {
         saveTokenButton = findViewById(R.id.saveTokenButton)
         uploadNowButton = findViewById(R.id.uploadNowButton)
         statusText = findViewById(R.id.statusText)
+        healthCheckText = findViewById(R.id.healthCheckText)
         uploadProgressBar = findViewById(R.id.uploadProgressBar)
         progressText = findViewById(R.id.progressText)
         photoGalleryRecyclerView = findViewById(R.id.photoGalleryRecyclerView)
@@ -88,12 +91,10 @@ class MainActivity : AppCompatActivity() {
             val appTitle = "Storj Photo Uploader (${BuildConfig.GIT_COMMIT_HASH})"
             val titleText = findViewById<TextView>(R.id.titleText)
             titleText.text = appTitle
-            supportActionBar?.title = appTitle
         } catch (e: Exception) {
             Log.e(TAG, "Error setting title", e)
             val titleText = findViewById<TextView>(R.id.titleText)
             titleText.text = "Storj Photo Uploader"
-            supportActionBar?.title = "Storj Photo Uploader"
         }
 
         // Initialize SharedPreferences
@@ -140,6 +141,9 @@ class MainActivity : AppCompatActivity() {
         uploadNowButton.setOnClickListener {
             uploadPhotosManually()
         }
+
+        // Start periodic health check
+        startHealthCheck()
     }
 
     override fun onResume() {
@@ -149,6 +153,12 @@ class MainActivity : AppCompatActivity() {
             permissionChecked = true
             checkAndRequestPermission()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Cancel health check job
+        healthCheckJob?.cancel()
     }
 
     private fun saveToken() {
@@ -344,6 +354,33 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "Loaded ${photos.size} photos")
         } catch (e: Exception) {
             Log.e(TAG, "Error loading photos", e)
+        }
+    }
+
+    private fun startHealthCheck() {
+        healthCheckJob?.cancel()
+        healthCheckJob = lifecycleScope.launch {
+            while (true) {
+                performHealthCheck()
+                kotlinx.coroutines.delay(30000) // 30 seconds
+            }
+        }
+    }
+
+    private suspend fun performHealthCheck() {
+        val result = photoRepository.checkApiHealth()
+        val isHealthy = result.getOrDefault(false)
+
+        updateHealthCheckUI(isHealthy)
+    }
+
+    private fun updateHealthCheckUI(isHealthy: Boolean) {
+        if (isHealthy) {
+            healthCheckText.text = "API: Connected ✓"
+            healthCheckText.setTextColor(getColor(android.R.color.holo_green_dark))
+        } else {
+            healthCheckText.text = "API: Disconnected ✗"
+            healthCheckText.setTextColor(getColor(android.R.color.holo_red_dark))
         }
     }
 }

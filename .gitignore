@@ -10,3 +10,4 @@ rclone.conf
 /storj_container_app/upload_target - コピー/*.heic
 /storj_uploader_backend_api_container_app/__pycache__/*.pyc
 /storj_local_structure/source_files - コピー/*.MOV
+/flutter
