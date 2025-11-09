@@ -4,7 +4,7 @@
 # Usage: ./generate-keystore.sh
 
 KEYSTORE_FILE="keystore.jks"
-KEY_ALIAS="myapp"
+KEY_ALIAS="storjapp"
 VALIDITY_DAYS=10000
 
 echo "======================================"
