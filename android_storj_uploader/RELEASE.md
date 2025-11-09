@@ -37,7 +37,7 @@ cp keystore.properties.example keystore.properties
 ```properties
 storeFile=keystore.jks
 storePassword=YOUR_ACTUAL_KEYSTORE_PASSWORD
-keyAlias=myapp
+keyAlias=storjapp
 keyPassword=YOUR_ACTUAL_KEY_PASSWORD
 ```
 
@@ -89,7 +89,7 @@ adb install app/build/outputs/apk/release/app-release.apk
    - キーストアのパスワード
 
 3. **KEY_ALIAS**
-   - キーのエイリアス（例: `myapp`）
+   - キーのエイリアス（例: `storjapp`）
 
 4. **KEY_PASSWORD**
    - キーのパスワード
@@ -204,7 +204,7 @@ jarsigner: unable to sign jar: java.util.zip.ZipException: invalid entry compres
 ./gradlew assembleRelease \
   -Pandroid.injected.signing.store.file=keystore.jks \
   -Pandroid.injected.signing.store.password=YOUR_PASSWORD \
-  -Pandroid.injected.signing.key.alias=myapp \
+  -Pandroid.injected.signing.key.alias=storjapp \
   -Pandroid.injected.signing.key.password=YOUR_PASSWORD
 ```
 
