@@ -154,3 +154,98 @@ class StorjClient:
                 "error": str(e),
                 "storj_app_available": False
             }
+
+    def list_storj_images(self, bucket_name: str = None, limit: int = 100, offset: int = 0) -> Tuple[bool, list, str]:
+        """
+        Storjからrcloneを使って画像リストを取得
+        Returns: (success: bool, images: list, error_message: str)
+        """
+        try:
+            # .envから設定を取得
+            if bucket_name is None:
+                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+            # rclone.confのパスを設定
+            rclone_conf = self.storj_app_path / "rclone.conf"
+            if not rclone_conf.exists():
+                return False, [], f"rclone.conf not found at {rclone_conf}"
+
+            env = os.environ.copy()
+            env["RCLONE_CONFIG"] = str(rclone_conf)
+
+            # rclone lsf コマンドでファイルリストを取得
+            # Format: path;size;time
+            remote_path = f"{remote_name}:{bucket_name}/"
+            cmd = [
+                "rclone", "lsf",
+                remote_path,
+                "--format", "pst",
+                "--recursive"
+            ]
+
+            print(f"[{datetime.now()}] Listing Storj images from {remote_path}")
+            print(f"Command: {' '.join(cmd)}")
+
+            result = subprocess.run(
+                cmd,
+                cwd=str(self.storj_app_path),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Unknown error"
+                print(f"rclone lsf failed: {error_msg}")
+                return False, [], error_msg
+
+            # Parse output
+            images = []
+            image_extensions = ('.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.tiff', '.gif')
+
+            for line in result.stdout.strip().split('\n'):
+                if not line:
+                    continue
+
+                # Parse: path;size;time
+                parts = line.split(';')
+                if len(parts) != 3:
+                    continue
+
+                path, size_str, mod_time = parts
+
+                # Filter image files only
+                if not path.lower().endswith(image_extensions):
+                    continue
+
+                filename = path.split('/')[-1]
+
+                try:
+                    size = int(size_str)
+                except ValueError:
+                    size = 0
+
+                images.append({
+                    "filename": filename,
+                    "path": path,
+                    "size": size,
+                    "modified_time": mod_time,
+                    "thumbnail_url": None,
+                    "url": None
+                })
+
+            print(f"Found {len(images)} images in Storj")
+
+            # Apply pagination
+            total_count = len(images)
+            paginated_images = images[offset:offset + limit]
+
+            return True, paginated_images, f"Successfully retrieved {len(paginated_images)} images"
+
+        except subprocess.TimeoutExpired:
+            return False, [], "rclone command timed out"
+        except Exception as e:
+            print(f"Error listing Storj images: {str(e)}")
+            return False, [], str(e)

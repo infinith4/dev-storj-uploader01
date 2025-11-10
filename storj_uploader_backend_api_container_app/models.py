@@ -157,3 +157,50 @@ class ErrorResponse(BaseModel):
                 "error": "ファイルサイズが上限を超えています"
             }
         }
+
+class StorjImageItem(BaseModel):
+    """Storjに保存された画像情報モデル"""
+    filename: str = Field(..., description="ファイル名")
+    path: str = Field(..., description="Storjでのフルパス")
+    size: int = Field(..., description="ファイルサイズ（バイト）")
+    modified_time: str = Field(..., description="最終更新時刻（ISO 8601形式）")
+    thumbnail_url: Optional[str] = Field(None, description="サムネイルURL（将来実装）")
+    url: Optional[str] = Field(None, description="フルサイズ画像URL（将来実装）")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filename": "photo_20250110_abc123.jpg",
+                "path": "202501/photo_20250110_abc123.jpg",
+                "size": 2457600,
+                "modified_time": "2025-01-10T12:34:56Z",
+                "thumbnail_url": None,
+                "url": None
+            }
+        }
+
+class StorjImageListResponse(BaseModel):
+    """Storj画像リストレスポンスモデル"""
+    success: bool = Field(..., description="リクエスト成功フラグ")
+    images: List[StorjImageItem] = Field(..., description="画像リスト")
+    total_count: int = Field(..., description="総画像数")
+    message: Optional[str] = Field(None, description="メッセージ")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "images": [
+                    {
+                        "filename": "photo_20250110_abc123.jpg",
+                        "path": "202501/photo_20250110_abc123.jpg",
+                        "size": 2457600,
+                        "modified_time": "2025-01-10T12:34:56Z",
+                        "thumbnail_url": None,
+                        "url": None
+                    }
+                ],
+                "total_count": 1,
+                "message": "Successfully retrieved 1 images"
+            }
+        }

@@ -21,7 +21,8 @@ from dotenv import load_dotenv
 from storj_client import StorjClient
 from models import (
     UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse,
-    ErrorResponse, FileUploadResult, FileInfo, FileStatus
+    ErrorResponse, FileUploadResult, FileInfo, FileStatus,
+    StorjImageListResponse, StorjImageItem
 )
 
 load_dotenv()
@@ -581,6 +582,66 @@ async def trigger_upload_async():
             "status": "error",
             "message": f"アップロード開始エラー: {str(e)}"
         }
+
+@app.get(
+    "/storj/images",
+    response_model=StorjImageListResponse,
+    tags=["storj"],
+    summary="Storj画像リスト取得",
+    description="""Storjに保存されている画像のリストを取得します。
+
+    **パラメータ:**
+    - **limit**: 取得する最大画像数（デフォルト: 100）
+    - **offset**: ページネーション用のオフセット（デフォルト: 0）
+    - **bucket**: Storjバケット名（指定しない場合は環境変数から取得）
+
+    **使用例:**
+    ```bash
+    # 最初の100枚を取得
+    curl http://localhost:8010/storj/images
+
+    # 50枚をスキップして次の20枚を取得
+    curl "http://localhost:8010/storj/images?limit=20&offset=50"
+    ```
+    """
+)
+async def get_storj_images(
+    limit: int = 100,
+    offset: int = 0,
+    bucket: str = None
+):
+    """
+    Storjに保存されている画像リストを取得
+    """
+    try:
+        success, images, message = storj_client.list_storj_images(
+            bucket_name=bucket,
+            limit=limit,
+            offset=offset
+        )
+
+        if not success:
+            return StorjImageListResponse(
+                success=False,
+                images=[],
+                total_count=0,
+                message=f"Failed to retrieve images: {message}"
+            )
+
+        return StorjImageListResponse(
+            success=True,
+            images=[StorjImageItem(**img) for img in images],
+            total_count=len(images),
+            message=message
+        )
+
+    except Exception as e:
+        return StorjImageListResponse(
+            success=False,
+            images=[],
+            total_count=0,
+            message=f"Error: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn

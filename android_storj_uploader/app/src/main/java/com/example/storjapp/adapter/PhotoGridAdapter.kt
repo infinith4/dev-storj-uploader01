@@ -28,11 +28,18 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
 
-        // Load image thumbnail
+        // Load image thumbnail from URI (local) or URL (Storj)
+        val imageSource = if (item.uri != null) {
+            item.uri
+        } else {
+            item.storjUrl
+        }
+
         Glide.with(holder.itemView.context)
-            .load(item.uri)
+            .load(imageSource)
             .centerCrop()
             .placeholder(android.R.drawable.ic_menu_gallery)
+            .error(android.R.drawable.ic_menu_report_image)
             .into(holder.photoImage)
 
         // Show upload status badge

@@ -27,11 +27,12 @@ class PhotoRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /**
-     * Get all photos with upload status
+     * Get all photos with upload status (local + Storj)
      */
     suspend fun getAllPhotosWithStatus(): List<PhotoItem> = withContext(Dispatchers.IO) {
         val photos = mutableListOf<PhotoItem>()
         val uploadedPhotos = getUploadedPhotoUris()
+        val localFileNames = mutableSetOf<String>()
 
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -41,6 +42,7 @@ class PhotoRepository(private val context: Context) {
 
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
+        // Get local photos
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
@@ -63,10 +65,43 @@ class PhotoRepository(private val context: Context) {
 
                 val isUploaded = uploadedPhotos.contains(uri.toString())
                 photos.add(PhotoItem(uri, name, dateAdded, isUploaded))
+                localFileNames.add(name)
             }
         }
 
-        Log.d(TAG, "Found ${photos.size} photos (${photos.count { it.isUploaded }} uploaded)")
+        Log.d(TAG, "Found ${photos.size} local photos (${photos.count { it.isUploaded }} uploaded)")
+
+        // Get Storj photos
+        try {
+            val storjResult = getStorjImages(limit = 100, offset = 0)
+            if (storjResult.isSuccess) {
+                val storjResponse = storjResult.getOrNull()
+                storjResponse?.images?.forEach { storjImage ->
+                    // Only add if not already in local photos
+                    if (!localFileNames.contains(storjImage.filename)) {
+                        photos.add(
+                            PhotoItem(
+                                uri = null,
+                                fileName = storjImage.filename,
+                                dateAdded = 0L,
+                                isUploaded = true,
+                                thumbnailPath = null,
+                                storjUrl = storjImage.url ?: storjImage.thumbnailUrl,
+                                storjPath = storjImage.path,
+                                isFromStorj = true
+                            )
+                        )
+                    }
+                }
+                Log.d(TAG, "Added ${storjResponse?.images?.size ?: 0} Storj photos")
+            } else {
+                Log.w(TAG, "Failed to fetch Storj photos: ${storjResult.exceptionOrNull()?.message}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching Storj photos", e)
+        }
+
+        Log.d(TAG, "Total photos: ${photos.size}")
         photos
     }
 
