@@ -17,7 +17,6 @@ interface StorjApiService {
     @Multipart
     @POST("/upload/files")
     suspend fun uploadFiles(
-        @Header("Authorization") authorization: String,
         @Part files: List<MultipartBody.Part>
     ): Response<UploadResponse>
 

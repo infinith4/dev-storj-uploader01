@@ -15,7 +15,6 @@ class PhotoUploadWorker(
     companion object {
         private const val TAG = "PhotoUploadWorker"
         const val PREFS_NAME = "StorjUploaderPrefs"
-        const val KEY_BEARER_TOKEN = "bearer_token"
         const val KEY_LAST_UPLOAD_TIME = "last_upload_time"
     }
 
@@ -27,13 +26,6 @@ class PhotoUploadWorker(
         Log.d(TAG, "Starting photo upload work...")
 
         return try {
-            // Get bearer token from SharedPreferences
-            val bearerToken = prefs.getString(KEY_BEARER_TOKEN, null)
-            if (bearerToken.isNullOrEmpty()) {
-                Log.e(TAG, "Bearer token not found")
-                return Result.failure()
-            }
-
             val currentTime = System.currentTimeMillis()
 
             // Get recent photos (last 24 hours)
@@ -55,7 +47,7 @@ class PhotoUploadWorker(
             for ((index, batch) in batches.withIndex()) {
                 Log.d(TAG, "Uploading batch ${index + 1}/${batches.size} (${batch.size} photos)")
 
-                val result = photoRepository.uploadPhotos(batch, bearerToken)
+                val result = photoRepository.uploadPhotos(batch)
 
                 if (result.isSuccess) {
                     // Mark photos as uploaded

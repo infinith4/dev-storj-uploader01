@@ -9,7 +9,7 @@ services:
       - MAX_FILE_SIZE=100000000
     volumes:
       - ./temp:/app/temp
-      - ../storj_container_app/upload_target:/app/upload_target
+      - ../storj_container_app:/app/storj_container_app
       - .:/app
     restart: unless-stopped
     networks:

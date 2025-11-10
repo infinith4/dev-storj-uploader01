@@ -13,10 +13,17 @@ class StorjClient:
     def __init__(self, storj_app_path: str = None):
         # Dockerコンテナ内では /app/storj_container_app、開発環境では ../storj_container_app
         if storj_app_path is None:
-            if os.path.exists("/app/storj_container_app"):
+            # 優先順位: 1. 絶対パス(Docker), 2. 相対パス(開発環境)
+            if os.path.exists("/app/storj_container_app/storj_uploader.py"):
                 storj_app_path = "/app/storj_container_app"
-            else:
+            elif os.path.exists("../storj_container_app/storj_uploader.py"):
                 storj_app_path = "../storj_container_app"
+            else:
+                # フォールバック: ディレクトリの存在のみチェック
+                if os.path.exists("/app/storj_container_app"):
+                    storj_app_path = "/app/storj_container_app"
+                else:
+                    storj_app_path = "../storj_container_app"
 
         self.storj_app_path = Path(storj_app_path)
         self.storj_script = self.storj_app_path / "storj_uploader.py"
@@ -66,13 +73,22 @@ class StorjClient:
                 print(f"Working directory: {self.storj_app_path}")
                 print(f"Script path: {self.storj_script}")
 
+                # 環境変数を準備 (rclone設定パスなど)
+                env = os.environ.copy()
+
+                # rclone.confのパスを設定
+                rclone_conf = self.storj_app_path / "rclone.conf"
+                if rclone_conf.exists():
+                    env['RCLONE_CONFIG'] = str(rclone_conf)
+
                 # storj_container_appディレクトリで実行
                 result = subprocess.run(
                     ["python3", str(self.storj_script)],
                     cwd=str(self.storj_app_path),
                     capture_output=True,
                     text=True,
-                    timeout=300  # 5分のタイムアウト
+                    timeout=300,  # 5分のタイムアウト
+                    env=env
                 )
 
                 if result.returncode == 0:

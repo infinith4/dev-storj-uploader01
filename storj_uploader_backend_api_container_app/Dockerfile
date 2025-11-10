@@ -2,8 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# システムの依存関係をインストール
+# システムの依存関係をインストール (rclone追加)
 RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    && curl https://rclone.org/install.sh | bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Pythonの依存関係をコピー・インストール

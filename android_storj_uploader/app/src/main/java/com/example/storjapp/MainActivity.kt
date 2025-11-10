@@ -25,7 +25,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import com.example.storjapp.adapter.PhotoGalleryAdapter
 import com.example.storjapp.repository.PhotoRepository
 import com.example.storjapp.worker.PhotoUploadWorker
-import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -34,11 +33,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val PREFS_NAME = "StorjUploaderPrefs"
-        private const val KEY_BEARER_TOKEN = "bearer_token"
     }
 
-    private lateinit var tokenInput: TextInputEditText
-    private lateinit var saveTokenButton: Button
     private lateinit var uploadNowButton: Button
     private lateinit var statusText: TextView
     private lateinit var healthCheckText: TextView
@@ -76,8 +72,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Initialize views
-        tokenInput = findViewById(R.id.tokenInput)
-        saveTokenButton = findViewById(R.id.saveTokenButton)
         uploadNowButton = findViewById(R.id.uploadNowButton)
         statusText = findViewById(R.id.statusText)
         healthCheckText = findViewById(R.id.healthCheckText)
@@ -123,21 +117,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Load saved token
-        val savedToken = prefs.getString(KEY_BEARER_TOKEN, "")
-        if (!savedToken.isNullOrEmpty()) {
-            tokenInput.setText(savedToken)
-            uploadNowButton.isEnabled = true
-            updateStatus("Token configured")
-        } else {
-            updateStatus("Please configure Bearer Token")
-        }
+        // Enable upload button immediately
+        uploadNowButton.isEnabled = true
+        updateStatus("Ready")
 
         // Setup button listeners
-        saveTokenButton.setOnClickListener {
-            saveToken()
-        }
-
         uploadNowButton.setOnClickListener {
             uploadPhotosManually()
         }
@@ -161,21 +145,6 @@ class MainActivity : AppCompatActivity() {
         healthCheckJob?.cancel()
     }
 
-    private fun saveToken() {
-        val token = tokenInput.text.toString().trim()
-        if (token.isEmpty()) {
-            Toast.makeText(this, "Please enter a Bearer Token", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        prefs.edit().putString(KEY_BEARER_TOKEN, token).apply()
-        uploadNowButton.isEnabled = true
-        updateStatus("Token saved")
-        Toast.makeText(this, "Token saved successfully", Toast.LENGTH_SHORT).show()
-
-        // Setup auto-upload after saving token
-        setupAutoUpload()
-    }
 
     private fun checkAndRequestPermission() {
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -200,12 +169,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupAutoUpload() {
-        val token = prefs.getString(KEY_BEARER_TOKEN, null)
-        if (token.isNullOrEmpty()) {
-            Log.w(TAG, "Cannot setup auto-upload: No bearer token configured")
-            return
-        }
-
         // Create periodic work request (runs every 15 minutes)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -241,12 +204,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun uploadPhotosManually() {
-        val token = prefs.getString(KEY_BEARER_TOKEN, null)
-        if (token.isNullOrEmpty()) {
-            Toast.makeText(this, "Please save Bearer Token first", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         uploadNowButton.isEnabled = false
         updateStatus("Uploading photos...")
         showProgress(true)
@@ -278,7 +235,7 @@ class MainActivity : AppCompatActivity() {
                 var failureCount = 0
 
                 for ((index, batch) in batches.withIndex()) {
-                    val result = photoRepository.uploadPhotos(batch, token)
+                    val result = photoRepository.uploadPhotos(batch)
 
                     if (result.isSuccess) {
                         // Mark photos as uploaded
