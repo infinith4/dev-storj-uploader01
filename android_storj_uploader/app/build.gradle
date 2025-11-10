@@ -116,6 +116,12 @@ dependencies {
     // SwipeRefreshLayout
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
 
+    // Navigation Drawer
+    implementation 'androidx.drawerlayout:drawerlayout:1.2.0'
+
+    // Fragment
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+
     // Testing
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'

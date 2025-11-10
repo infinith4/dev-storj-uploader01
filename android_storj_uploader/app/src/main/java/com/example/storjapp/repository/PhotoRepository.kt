@@ -310,4 +310,38 @@ class PhotoRepository(private val context: Context) {
             Result.success(false)
         }
     }
+
+    /**
+     * Get list of images stored in Storj
+     * @param limit Maximum number of images to return
+     * @param offset Offset for pagination
+     * @param bucket Specific bucket name (optional)
+     */
+    suspend fun getStorjImages(
+        limit: Int? = 100,
+        offset: Int? = 0,
+        bucket: String? = null
+    ): Result<com.example.storjapp.model.StorjImageListResponse> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Fetching Storj images (limit: $limit, offset: $offset)")
+            val response = RetrofitClient.apiService.getStorjImages(limit, offset, bucket)
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) {
+                    Log.d(TAG, "✓ Fetched ${body.images.size} images from Storj")
+                    Result.success(body)
+                } else {
+                    Log.e(TAG, "✗ Response body is null")
+                    Result.failure(Exception("Response body is null"))
+                }
+            } else {
+                Log.e(TAG, "✗ Failed to fetch Storj images: ${response.code()}")
+                Result.failure(Exception("API error: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error fetching Storj images", e)
+            Result.failure(e)
+        }
+    }
 }

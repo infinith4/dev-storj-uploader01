@@ -22,7 +22,12 @@
       "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell am force-stop com.example.storjapp.debug)",
       "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s PhotoRepository:D)",
       "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s PhotoRepository:D MainActivity:D PhotoUploadWorker:D)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s OkHttp)"
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s OkHttp)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" install -r \"C:\\Projects\\github\\infinith4\\dev-storj-uploader01\\android_storj_uploader\\app\\build\\outputs\\apk\\debug\\app-debug.apk\")",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s MainActivity:D PhotoRepository:D AndroidRuntime:E)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell screencap -p)",
+      "Bash(C:UsersandotAppDataLocalAndroidSdkplatform-toolsadb.exe exec-out cat)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s MainActivity:D SettingsActivity:D AndroidRuntime:E)"
     ],
     "deny": [],
     "ask": []

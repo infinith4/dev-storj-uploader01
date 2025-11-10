@@ -2,27 +2,25 @@ package com.example.storjapp
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.widget.Button
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.*
 import androidx.work.OneTimeWorkRequestBuilder
-import com.example.storjapp.adapter.PhotoGalleryAdapter
+import com.example.storjapp.adapter.PhotoGridAdapter
 import com.example.storjapp.repository.PhotoRepository
 import com.example.storjapp.worker.PhotoUploadWorker
 import kotlinx.coroutines.launch
@@ -35,16 +33,14 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_NAME = "StorjUploaderPrefs"
     }
 
-    private lateinit var uploadNowButton: Button
+    private lateinit var settingsButton: Button
     private lateinit var statusText: TextView
     private lateinit var healthCheckText: TextView
-    private lateinit var uploadProgressBar: ProgressBar
-    private lateinit var progressText: TextView
-    private lateinit var photoGalleryRecyclerView: RecyclerView
+    private lateinit var photoGridRecyclerView: RecyclerView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var prefs: SharedPreferences
     private lateinit var photoRepository: PhotoRepository
-    private lateinit var galleryAdapter: PhotoGalleryAdapter
+    private lateinit var gridAdapter: PhotoGridAdapter
     private var permissionChecked = false
     private var healthCheckJob: kotlinx.coroutines.Job? = null
 
@@ -72,12 +68,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Initialize views
-        uploadNowButton = findViewById(R.id.uploadNowButton)
+        settingsButton = findViewById(R.id.settingsButton)
         statusText = findViewById(R.id.statusText)
         healthCheckText = findViewById(R.id.healthCheckText)
-        uploadProgressBar = findViewById(R.id.uploadProgressBar)
-        progressText = findViewById(R.id.progressText)
-        photoGalleryRecyclerView = findViewById(R.id.photoGalleryRecyclerView)
+        photoGridRecyclerView = findViewById(R.id.photoGridRecyclerView)
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
 
         // Set title with commit version (with error handling)
@@ -97,11 +91,11 @@ class MainActivity : AppCompatActivity() {
         // Initialize repository
         photoRepository = PhotoRepository(this)
 
-        // Setup RecyclerView
-        galleryAdapter = PhotoGalleryAdapter()
-        photoGalleryRecyclerView.apply {
-            layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = galleryAdapter
+        // Setup RecyclerView with GridLayoutManager (3 columns)
+        gridAdapter = PhotoGridAdapter()
+        photoGridRecyclerView.apply {
+            layoutManager = GridLayoutManager(this@MainActivity, 3)
+            adapter = gridAdapter
         }
 
         // Load all photos asynchronously
@@ -117,13 +111,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Enable upload button immediately
-        uploadNowButton.isEnabled = true
         updateStatus("Ready")
 
-        // Setup button listeners
-        uploadNowButton.setOnClickListener {
-            uploadPhotosManually()
+        // Setup settings button listener
+        settingsButton.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
 
         // Start periodic health check
@@ -136,6 +129,11 @@ class MainActivity : AppCompatActivity() {
         if (!permissionChecked) {
             permissionChecked = true
             checkAndRequestPermission()
+        }
+
+        // Reload photos when returning from settings (in case upload status changed)
+        lifecycleScope.launch {
+            loadAllPhotos()
         }
     }
 
@@ -203,111 +201,15 @@ class MainActivity : AppCompatActivity() {
         updateStatus("Auto-upload active (every 15 min)")
     }
 
-    private fun uploadPhotosManually() {
-        uploadNowButton.isEnabled = false
-        updateStatus("Uploading photos...")
-        showProgress(true)
-
-        lifecycleScope.launch {
-            try {
-                val recentPhotos = photoRepository.getRecentPhotos(24)
-
-                if (recentPhotos.isEmpty()) {
-                    updateStatus("No recent photos to upload")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "No photos found from last 24 hours",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    uploadNowButton.isEnabled = true
-                    showProgress(false)
-                    return@launch
-                }
-
-                // Update progress
-                val totalPhotos = recentPhotos.size
-                updateProgressText(0, totalPhotos)
-
-                // Upload photos in batches
-                val batchSize = 5
-                val batches = recentPhotos.chunked(batchSize)
-                var uploadedCount = 0
-                var failureCount = 0
-
-                for ((index, batch) in batches.withIndex()) {
-                    val result = photoRepository.uploadPhotos(batch)
-
-                    if (result.isSuccess) {
-                        // Mark photos as uploaded
-                        photoRepository.markPhotosAsUploaded(batch)
-                        uploadedCount += batch.size
-                    } else {
-                        failureCount += batch.size
-                    }
-
-                    // Update progress
-                    val progress = ((index + 1) * 100) / batches.size
-                    updateProgressBar(progress)
-                    updateProgressText(uploadedCount, totalPhotos)
-                }
-
-                if (uploadedCount > 0) {
-                    updateStatus("Upload successful: $uploadedCount photos uploaded")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Uploaded $uploadedCount of $totalPhotos photos",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    // Reload photo gallery to reflect upload status
-                    loadAllPhotos()
-                } else {
-                    updateStatus("Upload failed")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Upload failed",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Upload error", e)
-                updateStatus("Error: ${e.message}")
-                Toast.makeText(
-                    this@MainActivity,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            } finally {
-                uploadNowButton.isEnabled = true
-                showProgress(false)
-            }
-        }
-    }
-
     private fun updateStatus(status: String) {
         statusText.text = "Status: $status"
         Log.d(TAG, "Status: $status")
     }
 
-    private fun showProgress(show: Boolean) {
-        uploadProgressBar.visibility = if (show) View.VISIBLE else View.GONE
-        progressText.visibility = if (show) View.VISIBLE else View.GONE
-        if (!show) {
-            uploadProgressBar.progress = 0
-        }
-    }
-
-    private fun updateProgressBar(progress: Int) {
-        uploadProgressBar.progress = progress
-    }
-
-    private fun updateProgressText(uploaded: Int, total: Int) {
-        progressText.text = "$uploaded / $total photos uploaded"
-    }
-
     private suspend fun loadAllPhotos() {
         try {
             val photos = photoRepository.getAllPhotosWithStatus()
-            galleryAdapter.updateItems(photos)
+            gridAdapter.updateItems(photos)
             Log.d(TAG, "Loaded ${photos.size} photos")
         } catch (e: Exception) {
             Log.e(TAG, "Error loading photos", e)

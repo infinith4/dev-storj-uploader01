@@ -7,23 +7,41 @@
     android:orientation="vertical"
     tools:context="com.example.storjapp.MainActivity">
 
-    <!-- Upper section (1/4 of screen) - Upload Progress -->
+    <!-- Upper section - Status Display -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp"
         android:background="@android:color/white">
 
-        <TextView
-            android:id="@+id/titleText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Storj Photo Uploader"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_gravity="center_horizontal" />
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/titleText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Storj Photo Uploader"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_centerHorizontal="true" />
+
+            <Button
+                android:id="@+id/settingsButton"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:text="☰"
+                android:textSize="32sp"
+                android:textColor="@android:color/black"
+                android:clickable="true"
+                android:focusable="true"
+                style="@style/Widget.Material3.Button.TextButton" />
+
+        </RelativeLayout>
 
         <TextView
             android:id="@+id/healthCheckText"
@@ -32,43 +50,16 @@
             android:text="API: Checking..."
             android:textSize="12sp"
             android:gravity="center"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="8dp"
             android:textColor="@android:color/darker_gray" />
 
         <TextView
             android:id="@+id/statusText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Status: Not configured"
+            android:text="Status: Ready"
             android:textSize="14sp"
             android:gravity="center"
-            android:layout_marginTop="38dp" />
-
-        <ProgressBar
-            android:id="@+id/uploadProgressBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:progress="0"
-            android:max="100"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/progressText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="0 / 0 photos uploaded"
-            android:textSize="12sp"
-            android:gravity="center"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/uploadNowButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Upload Photos Now"
-            android:enabled="false"
             android:layout_marginTop="8dp" />
 
     </LinearLayout>
@@ -79,11 +70,11 @@
         android:layout_height="2dp"
         android:background="@android:color/darker_gray" />
 
-    <!-- Lower section (3/4 of screen) - Photo Gallery -->
+    <!-- Lower section - Photo Grid -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="3"
+        android:layout_weight="1"
         android:orientation="vertical"
         android:background="#F5F5F5">
 
@@ -102,13 +93,12 @@
             android:layout_height="match_parent">
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/photoGalleryRecyclerView"
+                android:id="@+id/photoGridRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                tools:listitem="@layout/item_upload_history" />
+                android:padding="4dp"
+                tools:listitem="@layout/item_photo_grid" />
 
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
