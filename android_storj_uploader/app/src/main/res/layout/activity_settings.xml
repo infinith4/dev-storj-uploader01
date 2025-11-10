@@ -9,13 +9,33 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Upload Settings"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="アップロード一覧"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:layout_centerHorizontal="true" />
+
+            <Button
+                android:id="@+id/menuButton"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:text="☰"
+                android:textSize="32sp"
+                android:textColor="@android:color/black"
+                android:clickable="true"
+                android:focusable="true"
+                style="@style/Widget.Material3.Button.TextButton" />
+
+        </RelativeLayout>
 
         <TextView
             android:id="@+id/statusText"

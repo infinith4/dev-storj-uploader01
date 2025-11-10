@@ -2,8 +2,10 @@ package com.example.storjapp
 
 import android.os.Bundle
 import android.util.Log
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
+import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -18,6 +20,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val TAG = "SettingsActivity"
     }
 
+    private lateinit var menuButton: Button
     private lateinit var uploadNowButton: Button
     private lateinit var statusText: TextView
     private lateinit var uploadProgressBar: ProgressBar
@@ -29,10 +32,11 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
 
         // Set title
-        title = "Settings"
+        title = "アップロード一覧"
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         // Initialize views
+        menuButton = findViewById(R.id.menuButton)
         uploadNowButton = findViewById(R.id.uploadNowButton)
         statusText = findViewById(R.id.statusText)
         uploadProgressBar = findViewById(R.id.uploadProgressBar)
@@ -40,6 +44,11 @@ class SettingsActivity : AppCompatActivity() {
 
         // Initialize repository
         photoRepository = PhotoRepository(this)
+
+        // Setup menu button listener with popup menu
+        menuButton.setOnClickListener { view ->
+            showSettingsMenu(view)
+        }
 
         // Setup upload button
         uploadNowButton.setOnClickListener {
@@ -142,5 +151,22 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updateProgressText(uploaded: Int, total: Int) {
         progressText.text = "$uploaded / $total photos uploaded"
+    }
+
+    private fun showSettingsMenu(view: View) {
+        val popupMenu = PopupMenu(this, view)
+        popupMenu.menuInflater.inflate(R.menu.settings_menu, popupMenu.menu)
+
+        popupMenu.setOnMenuItemClickListener { menuItem: MenuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_main -> {
+                    finish() // Close current activity and return to MainActivity
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popupMenu.show()
     }
 }

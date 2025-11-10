@@ -8,7 +8,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.MenuItem
 import android.widget.Button
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -113,10 +115,9 @@ class MainActivity : AppCompatActivity() {
 
         updateStatus("Ready")
 
-        // Setup settings button listener
-        settingsButton.setOnClickListener {
-            val intent = Intent(this, SettingsActivity::class.java)
-            startActivity(intent)
+        // Setup settings button listener with popup menu
+        settingsButton.setOnClickListener { view ->
+            showMainMenu(view)
         }
 
         // Start periodic health check
@@ -241,5 +242,23 @@ class MainActivity : AppCompatActivity() {
             healthCheckText.text = "API: Disconnected ✗"
             healthCheckText.setTextColor(getColor(android.R.color.holo_red_dark))
         }
+    }
+
+    private fun showMainMenu(view: android.view.View) {
+        val popupMenu = PopupMenu(this, view)
+        popupMenu.menuInflater.inflate(R.menu.main_menu, popupMenu.menu)
+
+        popupMenu.setOnMenuItemClickListener { menuItem: MenuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_upload_list -> {
+                    val intent = Intent(this, SettingsActivity::class.java)
+                    startActivity(intent)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popupMenu.show()
     }
 }
