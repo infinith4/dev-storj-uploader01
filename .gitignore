@@ -12,3 +12,4 @@ rclone.conf
 /storj_local_structure/source_files - コピー/*.MOV
 /flutter
 storj_local_structure
+venv
