@@ -25,7 +25,11 @@ from models import (
     StorjImageListResponse, StorjImageItem
 )
 
-load_dotenv()
+# Load environment variables from storj_container_app/.env
+load_dotenv()  # Load from current directory first
+storj_env_path = Path(__file__).parent / "../storj_container_app/.env"
+if storj_env_path.exists():
+    load_dotenv(storj_env_path)  # Override with storj_container_app settings
 
 # OpenAPI v3メタデータ設定
 app = FastAPI(
