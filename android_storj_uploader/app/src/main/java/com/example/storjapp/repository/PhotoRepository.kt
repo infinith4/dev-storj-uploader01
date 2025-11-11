@@ -86,7 +86,7 @@ class PhotoRepository(private val context: Context) {
                                 dateAdded = 0L,
                                 isUploaded = true,
                                 thumbnailPath = null,
-                                storjUrl = storjImage.url ?: storjImage.thumbnailUrl,
+                                storjUrl = storjImage.thumbnailUrl ?: storjImage.url,
                                 storjPath = storjImage.path,
                                 isFromStorj = true
                             )
