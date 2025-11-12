@@ -345,13 +345,16 @@ class StorjClient:
                 timeout=30
             )
 
-            if result.returncode == 0:
+            if result.returncode == 0 and len(result.stdout) > 0:
                 # サムネイルが存在する場合
                 print(f"[{datetime.now()}] Successfully fetched thumbnail: {len(result.stdout)} bytes")
                 return True, result.stdout, "Success (pre-generated)"
             else:
                 # サムネイルが存在しない場合（旧データ）、オンデマンドで生成
-                print(f"[{datetime.now()}] Thumbnail not found, generating on-demand for {image_path}")
+                if result.returncode == 0:
+                    print(f"[{datetime.now()}] Thumbnail is empty (0 bytes), generating on-demand for {image_path}")
+                else:
+                    print(f"[{datetime.now()}] Thumbnail not found, generating on-demand for {image_path}")
 
                 # キャッシュディレクトリのパス
                 cache_dir = Path(__file__).parent / "thumbnail_cache"
