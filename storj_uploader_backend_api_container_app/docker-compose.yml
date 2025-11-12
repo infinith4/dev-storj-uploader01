@@ -11,6 +11,7 @@ services:
       - STORJ_REMOTE_NAME=storj
     volumes:
       - ./temp:/app/temp
+      - ./thumbnail_cache:/app/thumbnail_cache
       - ../storj_container_app:/app/storj_container_app
       - .:/app
     restart: unless-stopped

@@ -6,7 +6,7 @@ FastAPI + OpenAPI v3対応のファイルアップロードAPI
 HEICやJPEGなどの画像ファイル、動画ファイル、その他すべてのファイル形式に対応
 """
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
@@ -646,6 +646,98 @@ async def get_storj_images(
             total_count=0,
             message=f"Error: {str(e)}"
         )
+
+@app.get(
+    "/storj/images/{image_path:path}",
+    tags=["storj"],
+    summary="Storj画像取得",
+    description="""Storjに保存されている画像を取得します。
+
+    **パラメータ:**
+    - **image_path**: Storj内の画像パス（例: 202509/image_abc123.jpg）
+    - **bucket**: Storjバケット名（オプション、指定しない場合は環境変数から取得）
+    - **thumbnail**: trueの場合、300x300pxのサムネイルを返す（デフォルト: true）
+
+    **使用例:**
+    ```bash
+    # サムネイルを取得（デフォルト）
+    curl http://localhost:8010/storj/images/202509/image_abc123.jpg
+
+    # フルサイズ画像を取得
+    curl "http://localhost:8010/storj/images/202509/image_abc123.jpg?thumbnail=false"
+    ```
+    """,
+    responses={
+        200: {
+            "description": "画像データ",
+            "content": {
+                "image/jpeg": {},
+                "image/png": {},
+                "image/webp": {},
+                "image/heic": {}
+            }
+        },
+        404: {"description": "画像が見つかりません"},
+        500: {"description": "サーバーエラー"}
+    }
+)
+async def get_storj_image(
+    image_path: str,
+    thumbnail: bool = True,
+    bucket: str = None
+):
+    """
+    Storjから画像を取得して配信
+    thumbnailがtrueの場合はサムネイル（300x300px）を返す
+    """
+    try:
+        # サムネイルまたはフルサイズ画像を取得
+        if thumbnail:
+            success, image_data, error_msg = storj_client.get_storj_thumbnail(
+                image_path=image_path,
+                bucket_name=bucket,
+                size=(300, 300)
+            )
+        else:
+            success, image_data, error_msg = storj_client.get_storj_image(
+                image_path=image_path,
+                bucket_name=bucket
+            )
+
+        if not success:
+            raise HTTPException(status_code=404, detail=error_msg)
+
+        # Content-Typeを判定
+        # サムネイルの場合は常にJPEG、それ以外は拡張子から判定
+        if thumbnail:
+            content_type = 'image/jpeg'
+        else:
+            ext = image_path.lower().split('.')[-1]
+            content_type_map = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'webp': 'image/webp',
+                'heic': 'image/heic',
+                'bmp': 'image/bmp',
+                'tiff': 'image/tiff',
+                'gif': 'image/gif'
+            }
+            content_type = content_type_map.get(ext, 'image/jpeg')
+
+        # Add cache headers (cache for 1 day for thumbnails, 1 hour for full images)
+        cache_max_age = 86400 if thumbnail else 3600  # 1 day or 1 hour
+        headers = {
+            "Cache-Control": f"public, max-age={cache_max_age}",
+            "ETag": f'"{image_path}{"_thumb" if thumbnail else ""}"'
+        }
+
+        return Response(content=image_data, media_type=content_type, headers=headers)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

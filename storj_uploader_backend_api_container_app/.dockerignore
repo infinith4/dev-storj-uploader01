@@ -11,3 +11,4 @@ __pycache__
 *.md
 temp/*
 !temp/.gitkeep
+thumbnail_cache/*

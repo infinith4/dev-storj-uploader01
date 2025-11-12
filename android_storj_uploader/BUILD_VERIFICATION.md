@@ -235,7 +235,7 @@ GitHub Actionsの実行環境では：
 3. 最新のワークフロー実行を確認:
    - ワークフロー名: `Android CI/CD`
    - ブランチ: `claude/github-actions-android-build-011CUwKn9pq1ALCxUY7nJNrj`
-   - コミット: `docs: Add build verification report for dev-android`
+   - コミット: `docs: Add build verification report for android_storj_uploader`
 
 4. 3つのジョブの結果を確認:
    - ✅ **build**: デバッグAPKのビルド
@@ -303,7 +303,7 @@ git push origin --tags
 2. 以下のシークレットを追加:
    - `KEYSTORE_BASE64`: キーストアファイルのBase64エンコード
      ```bash
-     cd dev-android
+     cd android_storj_uploader
      ./scripts/generate-keystore.sh  # キーストアを生成
      base64 -w 0 keystore.jks        # Base64エンコード（Linux）
      # または
