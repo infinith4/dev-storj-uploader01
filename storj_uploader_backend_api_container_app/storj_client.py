@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import threading
 import time
 from datetime import datetime
+from collections import defaultdict
 
 class StorjClient:
     """Storj Container Appとの連携クライアント"""
@@ -28,6 +29,13 @@ class StorjClient:
         self.storj_app_path = Path(storj_app_path)
         self.storj_script = self.storj_app_path / "storj_uploader.py"
         self.lock = threading.Lock()
+
+        # 同時実行制限: rcloneコマンドの並行実行を最大5つに制限
+        self.rclone_semaphore = threading.Semaphore(30)
+
+        # 画像ごとのロック: 同じ画像を複数スレッドが同時生成しないようにする
+        self.image_locks = defaultdict(threading.Lock)
+        self.image_locks_lock = threading.Lock()
 
     def check_storj_app_available(self) -> bool:
         """Storj Container Appが利用可能かチェック"""
@@ -260,50 +268,52 @@ class StorjClient:
         Storjから指定されたパスの画像を取得
         Returns: (success: bool, image_data: bytes, error_message: str)
         """
-        try:
-            # .envから設定を取得
-            if bucket_name is None:
-                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
-            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+        # rcloneセマフォで同時実行数を制限
+        with self.rclone_semaphore:
+            try:
+                # .envから設定を取得
+                if bucket_name is None:
+                    bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+                remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
 
-            # rclone.confのパスを設定
-            rclone_conf = self.storj_app_path / "rclone.conf"
-            if not rclone_conf.exists():
-                return False, b"", f"rclone.conf not found at {rclone_conf}"
+                # rclone.confのパスを設定
+                rclone_conf = self.storj_app_path / "rclone.conf"
+                if not rclone_conf.exists():
+                    return False, b"", f"rclone.conf not found at {rclone_conf}"
 
-            env = os.environ.copy()
-            env["RCLONE_CONFIG"] = str(rclone_conf)
+                env = os.environ.copy()
+                env["RCLONE_CONFIG"] = str(rclone_conf)
 
-            # rclone cat コマンドでファイルを取得
-            remote_path = f"{remote_name}:{bucket_name}/{image_path}"
-            cmd = [
-                "rclone", "cat",
-                remote_path
-            ]
+                # rclone cat コマンドでファイルを取得
+                remote_path = f"{remote_name}:{bucket_name}/{image_path}"
+                cmd = [
+                    "rclone", "cat",
+                    remote_path
+                ]
 
-            print(f"[{datetime.now()}] Fetching image from {remote_path}")
+                print(f"[{datetime.now()}] Fetching image from {remote_path}")
 
-            result = subprocess.run(
-                cmd,
-                cwd=str(self.storj_app_path),
-                env=env,
-                capture_output=True,
-                timeout=60
-            )
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(self.storj_app_path),
+                    env=env,
+                    capture_output=True,
+                    timeout=60
+                )
 
-            if result.returncode != 0:
-                error_msg = result.stderr.decode('utf-8') if result.stderr else "Unknown error"
-                print(f"rclone cat failed: {error_msg}")
-                return False, b"", error_msg
+                if result.returncode != 0:
+                    error_msg = result.stderr.decode('utf-8') if result.stderr else "Unknown error"
+                    print(f"rclone cat failed: {error_msg}")
+                    return False, b"", error_msg
 
-            print(f"Successfully fetched image: {len(result.stdout)} bytes")
-            return True, result.stdout, "Success"
+                print(f"Successfully fetched image: {len(result.stdout)} bytes")
+                return True, result.stdout, "Success"
 
-        except subprocess.TimeoutExpired:
-            return False, b"", "rclone command timed out"
-        except Exception as e:
-            print(f"Error fetching Storj image: {str(e)}")
-            return False, b"", str(e)
+            except subprocess.TimeoutExpired:
+                return False, b"", "rclone command timed out"
+            except Exception as e:
+                print(f"Error fetching Storj image: {str(e)}")
+                return False, b"", str(e)
 
     def get_storj_thumbnail(self, image_path: str, bucket_name: str = None, size: tuple = (300, 300)) -> Tuple[bool, bytes, str]:
         """
@@ -311,50 +321,28 @@ class StorjClient:
         サムネイルが存在しない場合は生成する（旧データ用のフォールバック）
         Returns: (success: bool, thumbnail_data: bytes, error_message: str)
         """
-        try:
-            # .envから設定を取得
-            if bucket_name is None:
-                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
-            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+        # 画像ごとのロックを取得（同じ画像への並行アクセスを防ぐ）
+        with self.image_locks_lock:
+            image_lock = self.image_locks[image_path]
 
-            # rclone.confのパスを設定
-            rclone_conf = self.storj_app_path / "rclone.conf"
-            if not rclone_conf.exists():
-                return False, b"", f"rclone.conf not found at {rclone_conf}"
+        # この画像専用のロックを取得
+        with image_lock:
+            try:
+                # .envから設定を取得
+                if bucket_name is None:
+                    bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+                remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
 
-            env = os.environ.copy()
-            env["RCLONE_CONFIG"] = str(rclone_conf)
+                # rclone.confのパスを設定
+                rclone_conf = self.storj_app_path / "rclone.conf"
+                if not rclone_conf.exists():
+                    return False, b"", f"rclone.conf not found at {rclone_conf}"
 
-            # サムネイルファイル名を生成（拡張子を.jpgに変更）
-            thumbnail_path = "thumbnails/" + image_path.rsplit('.', 1)[0] + '.jpg'
+                env = os.environ.copy()
+                env["RCLONE_CONFIG"] = str(rclone_conf)
 
-            # Storjからサムネイルを取得
-            remote_path = f"{remote_name}:{bucket_name}/{thumbnail_path}"
-            cmd = [
-                "rclone", "cat",
-                remote_path
-            ]
-
-            print(f"[{datetime.now()}] Fetching thumbnail from {remote_path}")
-
-            result = subprocess.run(
-                cmd,
-                cwd=str(self.storj_app_path),
-                env=env,
-                capture_output=True,
-                timeout=30
-            )
-
-            if result.returncode == 0 and len(result.stdout) > 0:
-                # サムネイルが存在する場合
-                print(f"[{datetime.now()}] Successfully fetched thumbnail: {len(result.stdout)} bytes")
-                return True, result.stdout, "Success (pre-generated)"
-            else:
-                # サムネイルが存在しない場合（旧データ）、オンデマンドで生成
-                if result.returncode == 0:
-                    print(f"[{datetime.now()}] Thumbnail is empty (0 bytes), generating on-demand for {image_path}")
-                else:
-                    print(f"[{datetime.now()}] Thumbnail not found, generating on-demand for {image_path}")
+                # サムネイルファイル名を生成（拡張子を.jpgに変更）
+                thumbnail_path = "thumbnails/" + image_path.rsplit('.', 1)[0] + '.jpg'
 
                 # キャッシュディレクトリのパス
                 cache_dir = Path(__file__).parent / "thumbnail_cache"
@@ -365,50 +353,83 @@ class StorjClient:
                 cache_path = cache_dir / cache_filename
 
                 # キャッシュが存在する場合は返す
-                if cache_path.exists():
+                if cache_path.exists() and cache_path.stat().st_size > 0:
                     print(f"[{datetime.now()}] Serving cached thumbnail for {image_path}")
                     with open(cache_path, 'rb') as f:
                         return True, f.read(), "Success (cached)"
 
-                # 元画像を取得してリサイズ
-                success, image_data, error_msg = self.get_storj_image(image_path, bucket_name)
+                # rcloneセマフォで同時実行数を制限
+                with self.rclone_semaphore:
+                    # Storjからサムネイルを取得
+                    remote_path = f"{remote_name}:{bucket_name}/{thumbnail_path}"
+                    cmd = [
+                        "rclone", "cat",
+                        remote_path
+                    ]
 
-                if not success:
-                    return False, b"", error_msg
+                    print(f"[{datetime.now()}] Fetching thumbnail from {remote_path}")
 
-                # Pillowで画像をリサイズ
-                from PIL import Image
-                import io
+                    result = subprocess.run(
+                        cmd,
+                        cwd=str(self.storj_app_path),
+                        env=env,
+                        capture_output=True,
+                        timeout=30
+                    )
 
-                try:
-                    # 画像を開く
-                    img = Image.open(io.BytesIO(image_data))
+                    if result.returncode == 0 and len(result.stdout) > 0:
+                        # サムネイルが存在する場合
+                        print(f"[{datetime.now()}] Successfully fetched thumbnail: {len(result.stdout)} bytes")
+                        return True, result.stdout, "Success (pre-generated)"
+                    else:
+                        # サムネイルが存在しない場合（旧データ）、オンデマンドで生成
+                        if result.returncode == 0:
+                            print(f"[{datetime.now()}] Thumbnail is empty (0 bytes), generating on-demand for {image_path}")
+                        else:
+                            print(f"[{datetime.now()}] Thumbnail not found, generating on-demand for {image_path}")
 
-                    # サムネイルを生成（アスペクト比を維持）
-                    img.thumbnail(size, Image.Resampling.LANCZOS)
+                        # 元画像を取得してリサイズ
+                        success, image_data, error_msg = self.get_storj_image(image_path, bucket_name)
 
-                    # JPEGとして保存（元の形式に関わらず）
-                    output = io.BytesIO()
-                    # RGBAの場合はRGBに変換
-                    if img.mode in ('RGBA', 'LA', 'P'):
-                        img = img.convert('RGB')
-                    img.save(output, format='JPEG', quality=85, optimize=True)
-                    thumbnail_data = output.getvalue()
+                        if not success:
+                            return False, b"", error_msg
 
-                    # キャッシュに保存
-                    with open(cache_path, 'wb') as f:
-                        f.write(thumbnail_data)
+                        # Pillowで画像をリサイズ
+                        from PIL import Image
+                        import io
 
-                    print(f"[{datetime.now()}] Thumbnail generated and cached: {len(thumbnail_data)} bytes")
-                    return True, thumbnail_data, "Success (generated on-demand)"
+                        try:
+                            # 画像を開く
+                            img = Image.open(io.BytesIO(image_data))
 
-                except Exception as e:
-                    print(f"Error generating thumbnail: {str(e)}")
-                    # サムネイル生成に失敗した場合は元画像を返す
-                    return True, image_data, f"Success (original - thumbnail failed: {str(e)})"
+                            # サムネイルを生成（アスペクト比を維持）
+                            img.thumbnail(size, Image.Resampling.LANCZOS)
 
-        except subprocess.TimeoutExpired:
-            return False, b"", "rclone command timed out"
-        except Exception as e:
-            print(f"Error in get_storj_thumbnail: {str(e)}")
-            return False, b"", str(e)
+                            # JPEGとして保存（元の形式に関わらず）
+                            output = io.BytesIO()
+                            # RGBAの場合はRGBに変換
+                            if img.mode in ('RGBA', 'LA', 'P'):
+                                img = img.convert('RGB')
+                            img.save(output, format='JPEG', quality=85, optimize=True)
+                            thumbnail_data = output.getvalue()
+
+                            # キャッシュに保存（アトミックな書き込み）
+                            temp_cache_path = cache_path.with_suffix('.tmp')
+                            with open(temp_cache_path, 'wb') as f:
+                                f.write(thumbnail_data)
+                            # アトミックに移動
+                            temp_cache_path.replace(cache_path)
+
+                            print(f"[{datetime.now()}] Thumbnail generated and cached: {len(thumbnail_data)} bytes")
+                            return True, thumbnail_data, "Success (generated on-demand)"
+
+                        except Exception as e:
+                            print(f"Error generating thumbnail: {str(e)}")
+                            # サムネイル生成に失敗した場合は元画像を返す
+                            return True, image_data, f"Success (original - thumbnail failed: {str(e)})"
+
+            except subprocess.TimeoutExpired:
+                return False, b"", "rclone command timed out"
+            except Exception as e:
+                print(f"Error in get_storj_thumbnail: {str(e)}")
+                return False, b"", str(e)
