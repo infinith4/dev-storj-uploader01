@@ -2,8 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# システムの依存関係をインストール
+# システムの依存関係をインストール (rclone追加)
 RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    && curl https://rclone.org/install.sh | bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Pythonの依存関係をコピー・インストール
@@ -14,10 +17,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # ディレクトリ作成
-RUN mkdir -p temp
+RUN mkdir -p temp thumbnail_cache
 
 # ポート設定
 EXPOSE 8010
 
 # アプリケーション起動
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "4"]

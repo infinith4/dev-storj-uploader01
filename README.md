@@ -7,11 +7,11 @@
 - **storj_uploader_frontend_container_app** - React + TypeScript フロントエンド
 - **storj_uploader_backend_api_container_app** - FastAPI バックエンドAPI
 - **storj_container_app** - rcloneベースのコアアップローダー
-- **dev-android** - Android モバイルアプリ (Kotlin)
+- **android_storj_uploader** - Android モバイルアプリ (Kotlin)
 
 ## Android アプリ
 
-Androidモバイルアプリは `dev-android` フォルダに配置されています。
+Androidモバイルアプリは `android_storj_uploader` フォルダに配置されています。
 
 ### 機能
 - Storj APIへの写真・動画アップロード
@@ -20,9 +20,9 @@ Androidモバイルアプリは `dev-android` フォルダに配置されてい�
 
 ### ドキュメント
 
-- [dev-android/README.md](dev-android/README.md) - ビルド方法と使い方
-- [dev-android/SCREEN_DESIGN.md](dev-android/SCREEN_DESIGN.md) - 画面設計書・画面遷移図
-- [dev-android/RELEASE.md](dev-android/RELEASE.md) - リリースビルド手順
+- [android_storj_uploader/README.md](android_storj_uploader/README.md) - ビルド方法と使い方
+- [android_storj_uploader/SCREEN_DESIGN.md](android_storj_uploader/SCREEN_DESIGN.md) - 画面設計書・画面遷移図
+- [android_storj_uploader/RELEASE.md](android_storj_uploader/RELEASE.md) - リリースビルド手順
 
 #### GitHub Actionsでの自動ビルド
 
@@ -41,7 +41,7 @@ git tag v1.0
 git push origin --tags
 ```
 
-詳細な手順は [dev-android/RELEASE.md](dev-android/RELEASE.md) を参照してください。
+詳細な手順は [android_storj_uploader/RELEASE.md](android_storj_uploader/RELEASE.md) を参照してください。
 
 ## Frontend, Backend 起動
 

@@ -7,9 +7,12 @@ services:
       - UPLOAD_TARGET_DIR=../storj_container_app/upload_target
       - TEMP_DIR=./temp
       - MAX_FILE_SIZE=100000000
+      - STORJ_BUCKET_NAME=prd-storj-uploader
+      - STORJ_REMOTE_NAME=storj
     volumes:
       - ./temp:/app/temp
-      - ../storj_container_app/upload_target:/app/upload_target
+      - ./thumbnail_cache:/app/thumbnail_cache
+      - ../storj_container_app:/app/storj_container_app
       - .:/app
     restart: unless-stopped
     networks:

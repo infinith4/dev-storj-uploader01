@@ -1,21 +1,22 @@
 {
   "permissions": {
     "allow": [
-      "Bash(where:*)",
-      "Bash(java:*)",
-      "Bash(./gradlew build:*)",
-      "Bash(./gradlew clean build:*)",
-      "Bash(./gradlew:*)",
-      "Bash(git rev-parse:*)",
-      "Bash(git restore:*)",
-      "Bash(adb shell:*)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" devices)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell pm list packages)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" install -r app/build/outputs/apk/debug/app-debug.apk)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell am start -n com.example.storjapp.debug/com.example.storjapp.MainActivity)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" logcat -d -s AndroidRuntime:E)",
-      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" shell ps)"
+      "Bash(git push)",
+      "Bash(gh run list:*)",
+      "Bash(docker ps:*)",
+      "Bash(python:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(docker inspect:*)",
+      "Bash(wmic process where \"name=''python.exe''\" get ProcessId,CommandLine)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" kill-server)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

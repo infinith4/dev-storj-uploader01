@@ -2,33 +2,29 @@ package com.example.storjapp
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
+import android.view.MenuItem
 import android.widget.Button
-import android.widget.ProgressBar
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.*
-import com.example.storjapp.adapter.UploadHistoryAdapter
-import com.example.storjapp.model.UploadHistoryItem
-import com.example.storjapp.model.UploadStatus
+import androidx.work.OneTimeWorkRequestBuilder
+import com.example.storjapp.adapter.PhotoGridAdapter
 import com.example.storjapp.repository.PhotoRepository
 import com.example.storjapp.worker.PhotoUploadWorker
-import com.google.android.material.textfield.TextInputEditText
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -37,23 +33,18 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val PREFS_NAME = "StorjUploaderPrefs"
-        private const val KEY_BEARER_TOKEN = "bearer_token"
-        private const val KEY_UPLOAD_HISTORY = "upload_history"
     }
 
-    private lateinit var tokenInput: TextInputEditText
-    private lateinit var saveTokenButton: Button
-    private lateinit var uploadNowButton: Button
+    private lateinit var settingsButton: Button
     private lateinit var statusText: TextView
-    private lateinit var uploadProgressBar: ProgressBar
-    private lateinit var progressText: TextView
-    private lateinit var uploadHistoryRecyclerView: RecyclerView
+    private lateinit var healthCheckText: TextView
+    private lateinit var photoGridRecyclerView: RecyclerView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var prefs: SharedPreferences
     private lateinit var photoRepository: PhotoRepository
-    private lateinit var historyAdapter: UploadHistoryAdapter
-    private val gson = Gson()
+    private lateinit var gridAdapter: PhotoGridAdapter
     private var permissionChecked = false
+    private var healthCheckJob: kotlinx.coroutines.Job? = null
 
     // Permission launcher
     private val requestPermissionLauncher = registerForActivityResult(
@@ -79,13 +70,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Initialize views
-        tokenInput = findViewById(R.id.tokenInput)
-        saveTokenButton = findViewById(R.id.saveTokenButton)
-        uploadNowButton = findViewById(R.id.uploadNowButton)
+        settingsButton = findViewById(R.id.settingsButton)
         statusText = findViewById(R.id.statusText)
-        uploadProgressBar = findViewById(R.id.uploadProgressBar)
-        progressText = findViewById(R.id.progressText)
-        uploadHistoryRecyclerView = findViewById(R.id.uploadHistoryRecyclerView)
+        healthCheckText = findViewById(R.id.healthCheckText)
+        photoGridRecyclerView = findViewById(R.id.photoGridRecyclerView)
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
 
         // Set title with commit version (with error handling)
@@ -93,12 +81,10 @@ class MainActivity : AppCompatActivity() {
             val appTitle = "Storj Photo Uploader (${BuildConfig.GIT_COMMIT_HASH})"
             val titleText = findViewById<TextView>(R.id.titleText)
             titleText.text = appTitle
-            supportActionBar?.title = appTitle
         } catch (e: Exception) {
             Log.e(TAG, "Error setting title", e)
             val titleText = findViewById<TextView>(R.id.titleText)
             titleText.text = "Storj Photo Uploader"
-            supportActionBar?.title = "Storj Photo Uploader"
         }
 
         // Initialize SharedPreferences
@@ -107,44 +93,35 @@ class MainActivity : AppCompatActivity() {
         // Initialize repository
         photoRepository = PhotoRepository(this)
 
-        // Setup RecyclerView
-        historyAdapter = UploadHistoryAdapter()
-        uploadHistoryRecyclerView.apply {
-            layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = historyAdapter
+        // Setup RecyclerView with GridLayoutManager (3 columns)
+        gridAdapter = PhotoGridAdapter()
+        photoGridRecyclerView.apply {
+            layoutManager = GridLayoutManager(this@MainActivity, 3)
+            adapter = gridAdapter
         }
 
-        // Load upload history asynchronously
+        // Load all photos asynchronously
         lifecycleScope.launch {
-            loadUploadHistory()
+            loadAllPhotos()
         }
 
         // Setup SwipeRefreshLayout
         swipeRefreshLayout.setOnRefreshListener {
             lifecycleScope.launch {
-                loadUploadHistory()
+                loadAllPhotos()
                 swipeRefreshLayout.isRefreshing = false
             }
         }
 
-        // Load saved token
-        val savedToken = prefs.getString(KEY_BEARER_TOKEN, "")
-        if (!savedToken.isNullOrEmpty()) {
-            tokenInput.setText(savedToken)
-            uploadNowButton.isEnabled = true
-            updateStatus("Token configured")
-        } else {
-            updateStatus("Please configure Bearer Token")
+        updateStatus("Ready")
+
+        // Setup settings button listener with popup menu
+        settingsButton.setOnClickListener { view ->
+            showMainMenu(view)
         }
 
-        // Setup button listeners
-        saveTokenButton.setOnClickListener {
-            saveToken()
-        }
-
-        uploadNowButton.setOnClickListener {
-            uploadPhotosManually()
-        }
+        // Start periodic health check
+        startHealthCheck()
     }
 
     override fun onResume() {
@@ -154,23 +131,19 @@ class MainActivity : AppCompatActivity() {
             permissionChecked = true
             checkAndRequestPermission()
         }
-    }
 
-    private fun saveToken() {
-        val token = tokenInput.text.toString().trim()
-        if (token.isEmpty()) {
-            Toast.makeText(this, "Please enter a Bearer Token", Toast.LENGTH_SHORT).show()
-            return
+        // Reload photos when returning from settings (in case upload status changed)
+        lifecycleScope.launch {
+            loadAllPhotos()
         }
-
-        prefs.edit().putString(KEY_BEARER_TOKEN, token).apply()
-        uploadNowButton.isEnabled = true
-        updateStatus("Token saved")
-        Toast.makeText(this, "Token saved successfully", Toast.LENGTH_SHORT).show()
-
-        // Setup auto-upload after saving token
-        setupAutoUpload()
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Cancel health check job
+        healthCheckJob?.cancel()
+    }
+
 
     private fun checkAndRequestPermission() {
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -195,12 +168,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupAutoUpload() {
-        val token = prefs.getString(KEY_BEARER_TOKEN, null)
-        if (token.isNullOrEmpty()) {
-            Log.w(TAG, "Cannot setup auto-upload: No bearer token configured")
-            return
-        }
-
         // Create periodic work request (runs every 15 minutes)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -223,112 +190,16 @@ class MainActivity : AppCompatActivity() {
             uploadWorkRequest
         )
 
-        Log.d(TAG, "Auto-upload scheduled")
+        // Schedule an immediate one-time upload to test the setup
+        val immediateUploadRequest = OneTimeWorkRequestBuilder<PhotoUploadWorker>()
+            .setConstraints(constraints)
+            .setInitialDelay(30, TimeUnit.SECONDS) // 30 seconds after setup
+            .build()
+
+        WorkManager.getInstance(this).enqueue(immediateUploadRequest)
+
+        Log.d(TAG, "Auto-upload scheduled (periodic + immediate)")
         updateStatus("Auto-upload active (every 15 min)")
-    }
-
-    private fun uploadPhotosManually() {
-        val token = prefs.getString(KEY_BEARER_TOKEN, null)
-        if (token.isNullOrEmpty()) {
-            Toast.makeText(this, "Please save Bearer Token first", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        uploadNowButton.isEnabled = false
-        updateStatus("Uploading photos...")
-        showProgress(true)
-
-        lifecycleScope.launch {
-            try {
-                val recentPhotos = photoRepository.getRecentPhotos(24)
-
-                if (recentPhotos.isEmpty()) {
-                    updateStatus("No recent photos to upload")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "No photos found from last 24 hours",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    uploadNowButton.isEnabled = true
-                    showProgress(false)
-                    return@launch
-                }
-
-                // Update progress
-                val totalPhotos = recentPhotos.size
-                updateProgressText(0, totalPhotos)
-
-                // Upload photos in batches
-                val batchSize = 5
-                val batches = recentPhotos.chunked(batchSize)
-                var uploadedCount = 0
-
-                for ((index, batch) in batches.withIndex()) {
-                    val result = photoRepository.uploadPhotos(batch, token)
-
-                    if (result.isSuccess) {
-                        // Add to history
-                        batch.forEach { uri ->
-                            val fileName = uri.lastPathSegment ?: "unknown.jpg"
-                            val historyItem = UploadHistoryItem(
-                                id = System.currentTimeMillis(),
-                                photoUri = uri.toString(),
-                                fileName = fileName,
-                                uploadTime = System.currentTimeMillis(),
-                                status = UploadStatus.SUCCESS
-                            )
-                            addToUploadHistory(historyItem)
-                        }
-                        uploadedCount += batch.size
-                    } else {
-                        // Mark as failed in history
-                        batch.forEach { uri ->
-                            val fileName = uri.lastPathSegment ?: "unknown.jpg"
-                            val historyItem = UploadHistoryItem(
-                                id = System.currentTimeMillis(),
-                                photoUri = uri.toString(),
-                                fileName = fileName,
-                                uploadTime = System.currentTimeMillis(),
-                                status = UploadStatus.FAILED
-                            )
-                            addToUploadHistory(historyItem)
-                        }
-                    }
-
-                    // Update progress
-                    val progress = ((index + 1) * 100) / batches.size
-                    updateProgressBar(progress)
-                    updateProgressText(uploadedCount, totalPhotos)
-                }
-
-                if (uploadedCount > 0) {
-                    updateStatus("Upload successful: $uploadedCount photos uploaded")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Uploaded $uploadedCount of $totalPhotos photos",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    updateStatus("Upload failed")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Upload failed",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Upload error", e)
-                updateStatus("Error: ${e.message}")
-                Toast.makeText(
-                    this@MainActivity,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            } finally {
-                uploadNowButton.isEnabled = true
-                showProgress(false)
-            }
-        }
     }
 
     private fun updateStatus(status: String) {
@@ -336,68 +207,58 @@ class MainActivity : AppCompatActivity() {
         Log.d(TAG, "Status: $status")
     }
 
-    private fun showProgress(show: Boolean) {
-        uploadProgressBar.visibility = if (show) View.VISIBLE else View.GONE
-        progressText.visibility = if (show) View.VISIBLE else View.GONE
-        if (!show) {
-            uploadProgressBar.progress = 0
-        }
-    }
-
-    private fun updateProgressBar(progress: Int) {
-        uploadProgressBar.progress = progress
-    }
-
-    private fun updateProgressText(uploaded: Int, total: Int) {
-        progressText.text = "$uploaded / $total photos uploaded"
-    }
-
-    private fun loadUploadHistory() {
-        val historyJson = prefs.getString(KEY_UPLOAD_HISTORY, null)
-        if (historyJson != null) {
-            try {
-                val type = object : TypeToken<List<UploadHistoryItem>>() {}.type
-                val history: List<UploadHistoryItem> = gson.fromJson(historyJson, type)
-                historyAdapter.updateItems(history)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading upload history", e)
-            }
-        }
-    }
-
-    private fun saveUploadHistory(history: List<UploadHistoryItem>) {
+    private suspend fun loadAllPhotos() {
         try {
-            val historyJson = gson.toJson(history)
-            prefs.edit().putString(KEY_UPLOAD_HISTORY, historyJson).apply()
+            val photos = photoRepository.getAllPhotosWithStatus()
+            gridAdapter.updateItems(photos)
+            Log.d(TAG, "Loaded ${photos.size} photos")
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving upload history", e)
+            Log.e(TAG, "Error loading photos", e)
         }
     }
 
-    private fun addToUploadHistory(item: UploadHistoryItem) {
-        // Load current history
-        val historyJson = prefs.getString(KEY_UPLOAD_HISTORY, null)
-        val history = if (historyJson != null) {
-            try {
-                val type = object : TypeToken<MutableList<UploadHistoryItem>>() {}.type
-                gson.fromJson<MutableList<UploadHistoryItem>>(historyJson, type)
-            } catch (e: Exception) {
-                mutableListOf()
+    private fun startHealthCheck() {
+        healthCheckJob?.cancel()
+        healthCheckJob = lifecycleScope.launch {
+            while (true) {
+                performHealthCheck()
+                kotlinx.coroutines.delay(30000) // 30 seconds
             }
+        }
+    }
+
+    private suspend fun performHealthCheck() {
+        val result = photoRepository.checkApiHealth()
+        val isHealthy = result.getOrDefault(false)
+
+        updateHealthCheckUI(isHealthy)
+    }
+
+    private fun updateHealthCheckUI(isHealthy: Boolean) {
+        if (isHealthy) {
+            healthCheckText.text = "API: Connected ✓"
+            healthCheckText.setTextColor(getColor(android.R.color.holo_green_dark))
         } else {
-            mutableListOf()
+            healthCheckText.text = "API: Disconnected ✗"
+            healthCheckText.setTextColor(getColor(android.R.color.holo_red_dark))
+        }
+    }
+
+    private fun showMainMenu(view: android.view.View) {
+        val popupMenu = PopupMenu(this, view)
+        popupMenu.menuInflater.inflate(R.menu.main_menu, popupMenu.menu)
+
+        popupMenu.setOnMenuItemClickListener { menuItem: MenuItem ->
+            when (menuItem.itemId) {
+                R.id.menu_upload_list -> {
+                    val intent = Intent(this, SettingsActivity::class.java)
+                    startActivity(intent)
+                    true
+                }
+                else -> false
+            }
         }
 
-        // Add new item at beginning
-        history.add(0, item)
-
-        // Keep only last 100 items
-        if (history.size > 100) {
-            history.subList(100, history.size).clear()
-        }
-
-        // Save and update UI
-        saveUploadHistory(history)
-        historyAdapter.addItem(item)
+        popupMenu.show()
     }
 }

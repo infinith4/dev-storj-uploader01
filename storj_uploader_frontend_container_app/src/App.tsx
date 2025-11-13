@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Image, Video, FileText, BarChart3 } from 'lucide-react';
+import { Image, Video, FileText, BarChart3, Grid } from 'lucide-react';
 import UploaderTab from './components/UploaderTab';
 import SystemStatus from './components/SystemStatus';
+import ImageGallery from './components/ImageGallery';
 
-type TabType = 'images' | 'videos' | 'files' | 'status';
+type TabType = 'images' | 'videos' | 'files' | 'gallery' | 'status';
 
 interface Tab {
   id: TabType;
@@ -30,6 +31,12 @@ const tabs: Tab[] = [
     label: 'ファイル',
     icon: <FileText className="w-5 h-5" />,
     description: 'すべてのファイル形式に対応',
+  },
+  {
+    id: 'gallery',
+    label: '画像一覧',
+    icon: <Grid className="w-5 h-5" />,
+    description: 'Storjに保存された画像を表示',
   },
   {
     id: 'status',
@@ -74,6 +81,8 @@ const App: React.FC = () => {
             maxFiles={15}
           />
         );
+      case 'gallery':
+        return <ImageGallery />;
       case 'status':
         return <SystemStatus />;
       default:

@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.kapt'
 }
 
 android {
@@ -112,9 +113,23 @@ dependencies {
 
     // Glide for image loading
     implementation 'com.github.bumptech.glide:glide:4.16.0'
+    kapt 'com.github.bumptech.glide:compiler:4.16.0'
+    implementation 'com.github.bumptech.glide:okhttp3-integration:4.16.0'
 
     // SwipeRefreshLayout
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+
+    // Navigation Drawer
+    implementation 'androidx.drawerlayout:drawerlayout:1.2.0'
+
+    // Fragment
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+
+    // PhotoView for image zoom/pan
+    implementation 'com.github.chrisbanes:PhotoView:2.3.0'
+
+    // CoordinatorLayout
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
 
     // Testing
     testImplementation 'junit:junit:4.13.2'
