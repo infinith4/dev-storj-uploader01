@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push)",
+      "Bash(gh run list:*)",
+      "Bash(docker ps:*)",
+      "Bash(python:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(docker inspect:*)",
+      "Bash(wmic process where \"name=''python.exe''\" get ProcessId,CommandLine)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk)",
+      "Bash(\"C:\\Users\\andot\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe\" kill-server)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

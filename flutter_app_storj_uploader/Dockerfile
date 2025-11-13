@@ -1,0 +1,37 @@
+# Use official Flutter Docker image
+FROM ghcr.io/cirruslabs/flutter:stable
+
+# Set working directory
+WORKDIR /app
+
+# Check if flutter user exists, if not create it
+RUN id -u flutter >/dev/null 2>&1 || useradd -m flutter
+
+# Copy pubspec files
+COPY --chown=flutter:flutter pubspec.yaml pubspec.lock ./
+
+# Get dependencies
+RUN flutter pub get
+
+# Copy source code
+COPY --chown=flutter:flutter . .
+
+# Enable web platform and build
+RUN flutter config --enable-web && \
+    flutter create . --platforms web && \
+    flutter build web --release
+
+# Use nginx to serve the web app
+FROM nginx:alpine
+
+# Copy built web files to nginx
+COPY --from=0 /app/build/web /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

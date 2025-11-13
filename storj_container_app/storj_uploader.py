@@ -10,6 +10,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from PIL import Image
+import io
 
 class StorjUploader:
     def __init__(self):
@@ -221,6 +223,37 @@ class StorjUploader:
         pattern = rf'.*_[a-f0-9]{{{self.hash_length}}}(\.|$)'
         return bool(re.search(pattern, filename))
 
+    def _is_image_file(self, file_path):
+        """
+        Check if file is an image based on extension
+        """
+        image_extensions = {'.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.tiff', '.gif'}
+        return file_path.suffix.lower() in image_extensions
+
+    def generate_thumbnail(self, file_path, size=(300, 300)):
+        """
+        Generate thumbnail for image file
+        Returns: (success: bool, thumbnail_bytes: bytes, error_msg: str)
+        """
+        try:
+            # Open image
+            with Image.open(file_path) as img:
+                # Convert RGBA/LA/P to RGB for JPEG
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+
+                # Generate thumbnail (maintain aspect ratio)
+                img.thumbnail(size, Image.Resampling.LANCZOS)
+
+                # Save as JPEG
+                output = io.BytesIO()
+                img.save(output, format='JPEG', quality=85, optimize=True)
+                thumbnail_data = output.getvalue()
+
+                return True, thumbnail_data, ""
+        except Exception as e:
+            return False, b"", str(e)
+
     def upload_single_file(self, file_path):
         """Upload a single file and return result"""
         thread_id = threading.current_thread().name
@@ -278,13 +311,58 @@ class StorjUploader:
             if success:
                 with self.lock:
                     print(f"[{thread_id}] Successfully uploaded: {unique_filename}")
-                    # Move file to uploaded directory immediately after successful upload
+
+                # Generate and upload thumbnail if image file
+                if self._is_image_file(file_path):
+                    thumbnail_success, thumbnail_data, thumb_error = self.generate_thumbnail(file_path)
+                    if thumbnail_success:
+                        # Upload thumbnail to thumbnails/ directory
+                        thumbnail_remote_path = f"{self.remote_name}:{self.bucket_name}/thumbnails/{file_month}/"
+
+                        # Create thread-specific temporary directory for thumbnail
+                        thread_temp_dir = self.temp_dir / thread_id
+                        thread_temp_dir.mkdir(exist_ok=True)
+
+                        # Change extension to .jpg for thumbnail
+                        thumb_filename = unique_filename.rsplit('.', 1)[0] + '.jpg'
+                        temp_thumb_file = thread_temp_dir / thumb_filename
+
+                        try:
+                            # Write thumbnail data to temp file
+                            with open(temp_thumb_file, 'wb') as f:
+                                f.write(thumbnail_data)
+
+                            # Upload thumbnail
+                            thumb_command = f"rclone copy '{temp_thumb_file}' {thumbnail_remote_path}"
+                            thumb_success, thumb_output = self.run_rclone_command(thumb_command)
+
+                            if thumb_success:
+                                with self.lock:
+                                    print(f"[{thread_id}] Successfully uploaded thumbnail: {thumb_filename}")
+                            else:
+                                with self.lock:
+                                    print(f"[{thread_id}] Warning: Failed to upload thumbnail: {thumb_output}")
+                        finally:
+                            # Clean up temp thumbnail file
+                            if temp_thumb_file.exists():
+                                temp_thumb_file.unlink()
+                            try:
+                                thread_temp_dir.rmdir()
+                            except OSError:
+                                pass
+                    else:
+                        with self.lock:
+                            print(f"[{thread_id}] Warning: Failed to generate thumbnail: {thumb_error}")
+
+                # Move file to uploaded directory after successful upload
+                with self.lock:
                     try:
                         destination = self.uploaded_dir / file_path.name
                         shutil.move(str(file_path), str(destination))
                         print(f"[{thread_id}] Moved {file_path.name} to uploaded directory.")
                     except Exception as e:
                         print(f"[{thread_id}] Error moving {file_path.name}: {e}")
+
                 return True, file_path, "uploaded"
             else:
                 with self.lock:

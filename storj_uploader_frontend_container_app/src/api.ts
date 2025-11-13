@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse } from './types';
+import { UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse, StorjImageListResponse } from './types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8010';
 
@@ -107,6 +107,38 @@ export class StorjUploaderAPI {
   static async triggerUploadAsync(): Promise<TriggerUploadResponse> {
     const response = await api.post<TriggerUploadResponse>('/trigger-upload-async');
     return response.data;
+  }
+
+  // Storj画像リスト取得
+  static async getStorjImages(params?: {
+    limit?: number;
+    offset?: number;
+    bucket?: string;
+  }): Promise<StorjImageListResponse> {
+    const response = await api.get<StorjImageListResponse>('/storj/images', {
+      params: params || {}
+    });
+    return response.data;
+  }
+
+  // Storj画像のサムネイルURL生成
+  static getStorjThumbnailUrl(imagePath: string, bucket?: string): string {
+    const params = new URLSearchParams();
+    params.append('thumbnail', 'true');
+    if (bucket) {
+      params.append('bucket', bucket);
+    }
+    return `${API_BASE_URL}/storj/images/${imagePath}?${params.toString()}`;
+  }
+
+  // Storj画像のフルサイズURL生成
+  static getStorjImageUrl(imagePath: string, bucket?: string): string {
+    const params = new URLSearchParams();
+    params.append('thumbnail', 'false');
+    if (bucket) {
+      params.append('bucket', bucket);
+    }
+    return `${API_BASE_URL}/storj/images/${imagePath}?${params.toString()}`;
   }
 }
 
