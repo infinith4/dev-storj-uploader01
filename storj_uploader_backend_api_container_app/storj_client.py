@@ -211,8 +211,12 @@ class StorjClient:
 
             # Parse output
             images = []
+            thumbnails = {}  # サムネイルマップ: video_stem -> thumbnail_path
             image_extensions = ('.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.tiff', '.gif')
+            video_extensions = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.3gp', '.flv', '.wmv')
 
+            # First pass: collect all files and identify thumbnails
+            all_files = []
             for line in result.stdout.strip().split('\n'):
                 if not line:
                     continue
@@ -223,23 +227,52 @@ class StorjClient:
                     continue
 
                 path, size_str, mod_time = parts
-
-                # Filter image files only
-                if not path.lower().endswith(image_extensions):
-                    continue
-
                 filename = path.split('/')[-1]
+
+                # Check if this is a thumbnail file (ends with _thumb.jpg)
+                if filename.lower().endswith('_thumb.jpg'):
+                    # Extract the video stem (remove _thumb.jpg)
+                    video_stem = filename[:-10]  # Remove "_thumb.jpg"
+                    thumbnails[video_stem.lower()] = path
+
+                # Collect all media files (images and videos)
+                if path.lower().endswith(image_extensions) or path.lower().endswith(video_extensions):
+                    all_files.append((path, size_str, mod_time))
+
+            # Second pass: process media files and link thumbnails
+            for path, size_str, mod_time in all_files:
+                filename = path.split('/')[-1]
+
+                # Skip thumbnail files from the main list
+                if filename.lower().endswith('_thumb.jpg'):
+                    continue
 
                 try:
                     size = int(size_str)
                 except ValueError:
                     size = 0
 
-                # Generate URLs for image access
-                # Use environment variable or default to localhost
+                # Generate URLs for media access
                 api_base_url = os.getenv("API_BASE_URL", "http://10.0.2.2:8010")
-                thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
                 full_url = f"{api_base_url}/storj/images/{path}?thumbnail=false"
+
+                # Determine thumbnail URL
+                # For videos, check if a thumbnail exists
+                is_video = path.lower().endswith(video_extensions)
+                if is_video:
+                    # Check if there's a corresponding thumbnail
+                    file_stem = filename.rsplit('.', 1)[0]  # Remove extension
+                    thumbnail_path = thumbnails.get(file_stem.lower())
+
+                    if thumbnail_path:
+                        # Use the thumbnail file
+                        thumbnail_url = f"{api_base_url}/storj/images/{thumbnail_path}?thumbnail=false"
+                    else:
+                        # No thumbnail found, use the video itself
+                        thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
+                else:
+                    # For images, use the standard thumbnail parameter
+                    thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
 
                 images.append({
                     "filename": filename,
@@ -247,7 +280,8 @@ class StorjClient:
                     "size": size,
                     "modified_time": mod_time,
                     "thumbnail_url": thumbnail_url,
-                    "url": full_url
+                    "url": full_url,
+                    "is_video": is_video
                 })
 
             print(f"Found {len(images)} images in Storj")

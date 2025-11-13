@@ -25,6 +25,7 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val photoImage: ImageView = view.findViewById(R.id.photoImage)
         val uploadBadge: TextView = view.findViewById(R.id.uploadBadge)
+        val videoPlayIcon: ImageView = view.findViewById(R.id.videoPlayIcon)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -89,26 +90,45 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
             holder.uploadBadge.visibility = View.GONE
         }
 
-        // Set click listener to open ImageViewerActivity for Storj images
+        // Show video play icon if this is a video
+        if (item.isVideo) {
+            holder.videoPlayIcon.visibility = View.VISIBLE
+        } else {
+            holder.videoPlayIcon.visibility = View.GONE
+        }
+
+        // Set click listener to open ImageViewerActivity or VideoPlayerActivity
         holder.itemView.setOnClickListener {
             Log.d(TAG, "Item clicked - isFromStorj: ${item.isFromStorj}, storjPath: ${item.storjPath}, fileName: ${item.fileName}")
 
             if (item.isFromStorj && item.storjPath != null) {
                 try {
                     val context = holder.itemView.context
-                    val intent = Intent(context, ImageViewerActivity::class.java).apply {
-                        putExtra(ImageViewerActivity.EXTRA_IMAGE_PATH, item.storjPath)
-                        putExtra(ImageViewerActivity.EXTRA_IMAGE_FILENAME, item.fileName)
-                        putExtra(ImageViewerActivity.EXTRA_IMAGE_SIZE, 0L) // Size not available in PhotoItem
-                        putExtra(ImageViewerActivity.EXTRA_IMAGE_DATE, "") // Date not available in PhotoItem
+
+                    if (item.isVideo) {
+                        // TODO: Open VideoPlayerActivity when implemented
+                        Log.d(TAG, "Video clicked: ${item.fileName}")
+                        android.widget.Toast.makeText(
+                            context,
+                            "動画再生機能は実装中です",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        // Open ImageViewerActivity for images
+                        val intent = Intent(context, ImageViewerActivity::class.java).apply {
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_PATH, item.storjPath)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_FILENAME, item.fileName)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_SIZE, 0L) // Size not available in PhotoItem
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_DATE, "") // Date not available in PhotoItem
+                        }
+                        context.startActivity(intent)
+                        Log.d(TAG, "Successfully opened ImageViewerActivity for: ${item.fileName}")
                     }
-                    context.startActivity(intent)
-                    Log.d(TAG, "Successfully opened ImageViewerActivity for: ${item.fileName}")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error opening ImageViewerActivity", e)
+                    Log.e(TAG, "Error opening viewer activity", e)
                     android.widget.Toast.makeText(
                         holder.itemView.context,
-                        "画像を開けませんでした: ${e.message}",
+                        "ファイルを開けませんでした: ${e.message}",
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                 }

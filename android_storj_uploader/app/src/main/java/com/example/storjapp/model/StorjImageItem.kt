@@ -3,7 +3,7 @@ package com.example.storjapp.model
 import com.google.gson.annotations.SerializedName
 
 /**
- * Represents an image stored in Storj cloud storage
+ * Represents an image or video stored in Storj cloud storage
  */
 data class StorjImageItem(
     @SerializedName("filename")
@@ -22,7 +22,10 @@ data class StorjImageItem(
     val thumbnailUrl: String? = null,
 
     @SerializedName("url")
-    val url: String? = null
+    val url: String? = null,
+
+    @SerializedName("is_video")
+    val isVideo: Boolean = false
 )
 
 /**

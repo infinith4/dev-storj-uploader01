@@ -93,10 +93,12 @@ class PhotoRepository(private val context: Context) {
                                 thumbnailPath = null,
                                 storjUrl = thumbnailUrl,
                                 storjPath = storjImage.path,
-                                isFromStorj = true
+                                isFromStorj = true,
+                                isVideo = storjImage.isVideo
                             )
                         )
-                        Log.d(TAG, "Added Storj photo: ${storjImage.filename} with thumbnail URL: $thumbnailUrl")
+                        val mediaType = if (storjImage.isVideo) "video" else "photo"
+                        Log.d(TAG, "Added Storj $mediaType: ${storjImage.filename} with thumbnail URL: $thumbnailUrl")
                     }
                 }
                 Log.d(TAG, "Added ${storjResponse?.images?.size ?: 0} Storj photos")

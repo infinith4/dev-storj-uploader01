@@ -159,13 +159,14 @@ class ErrorResponse(BaseModel):
         }
 
 class StorjImageItem(BaseModel):
-    """Storjに保存された画像情報モデル"""
+    """Storjに保存された画像/動画情報モデル"""
     filename: str = Field(..., description="ファイル名")
     path: str = Field(..., description="Storjでのフルパス")
     size: int = Field(..., description="ファイルサイズ（バイト）")
     modified_time: str = Field(..., description="最終更新時刻（ISO 8601形式）")
-    thumbnail_url: Optional[str] = Field(None, description="サムネイルURL（将来実装）")
-    url: Optional[str] = Field(None, description="フルサイズ画像URL（将来実装）")
+    thumbnail_url: Optional[str] = Field(None, description="サムネイルURL")
+    url: Optional[str] = Field(None, description="フルサイズ画像/動画URL")
+    is_video: bool = Field(False, description="動画ファイルかどうか")
 
     class Config:
         json_schema_extra = {
@@ -174,8 +175,9 @@ class StorjImageItem(BaseModel):
                 "path": "202501/photo_20250110_abc123.jpg",
                 "size": 2457600,
                 "modified_time": "2025-01-10T12:34:56Z",
-                "thumbnail_url": None,
-                "url": None
+                "thumbnail_url": "http://localhost:8010/storj/images/202501/photo_20250110_abc123.jpg?thumbnail=true",
+                "url": "http://localhost:8010/storj/images/202501/photo_20250110_abc123.jpg?thumbnail=false",
+                "is_video": False
             }
         }
 
