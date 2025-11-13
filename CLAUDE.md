@@ -80,7 +80,7 @@ code .
 ```
 
 自動的に以下がセットアップされます：
-- Python 3.11, Node.js 18, rclone
+- Python 3.11, Node.js 18, rclone, Flutter SDK
 - 全コンポーネントの依存関係（pip, npm）
 - 必要なディレクトリとテンプレート .env ファイル
 - ポートフォワーディング（8010, 9010, 3000）
@@ -89,6 +89,30 @@ code .
 ```bash
 rclone config
 cp ~/.config/rclone/rclone.conf storj_container_app/
+```
+
+### Flutter SDK の使用
+
+Flutter SDK がインストールされ、`flutter` および `flutter pub` コマンドが利用可能です：
+
+```bash
+# Flutter のバージョン確認
+flutter --version
+
+# Flutter プロジェクトの依存関係を取得
+flutter pub get
+
+# Flutter プロジェクトを作成（新規プロジェクトの場合）
+flutter create my_app
+
+# Flutter アプリを実行
+flutter run
+```
+
+**注意**: Dev Container 内では、ターミナルを新規に開いた際に Flutter の PATH が自動的に設定されます。もし `flutter` コマンドが見つからない場合は、以下のコマンドを実行してください：
+
+```bash
+export PATH="$HOME/flutter/bin:$PATH"
 ```
 
 詳細は `.devcontainer/README.md` を参照してください。
