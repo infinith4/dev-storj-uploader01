@@ -4,21 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Storj file uploader system** with three main components:
+This is a **Storj file uploader system** with four main components:
 1. **storj_container_app** - Core Python uploader using rclone
 2. **storj_uploader_backend_api_container_app** - FastAPI backend with OpenAPI v3
 3. **storj_uploader_frontend_container_app** - React + TypeScript frontend
+4. **android_storj_uploader** - Kotlin Android mobile app
 
-The system allows users to upload files (images, videos, documents, etc.) through a web interface, which are then automatically uploaded to Storj cloud storage with intelligent deduplication and parallel processing.
+The system allows users to upload files (images, videos, documents, etc.) through web and mobile interfaces, which are then automatically uploaded to Storj cloud storage with intelligent deduplication and parallel processing.
 
 ## Architecture
 
 ### Data Flow
 ```
-Frontend (React) → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
+Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
 ```
 
-1. **Frontend** sends files via POST to backend API endpoints
+1. **Frontend/Android** sends files via POST to backend API endpoints
 2. **Backend** validates files, saves to `temp/`, moves to `../storj_container_app/upload_target/`
 3. **Auto-trigger**: When ≥5 files accumulate, backend automatically calls storj_uploader.py
 4. **Storj Container App** uses rclone to upload to Storj with hash-based deduplication
@@ -46,6 +47,8 @@ Frontend (React) → Backend API (FastAPI) → Storj Container App (rclone) → 
   - `POST /upload/files/single` - Single file (all formats)
   - `GET /health` - Health check
   - `GET /status` - System status with file counts
+  - `GET /storj/images` - List Storj images with thumbnail/full URLs
+  - `GET /storj/images/{path}` - Serve image (supports `thumbnail=true/false` query param)
   - `POST /trigger-upload` - Manual Storj upload (synchronous)
   - `POST /trigger-upload-async` - Manual Storj upload (asynchronous)
 - **Key classes**:
@@ -54,17 +57,35 @@ Frontend (React) → Backend API (FastAPI) → Storj Container App (rclone) → 
   - `StorjClient` (storj_client.py): Interface to storj_container_app
 - **Auto-upload**: Triggers when ≥5 files in upload_target
 - **Default port**: 8010
+- **CORS**: Allows localhost:9010, localhost:3000, 127.0.0.1:9010, 127.0.0.1:3000
 
 #### storj_uploader_frontend_container_app (React + TypeScript)
 - **Main components**:
-  - `App.tsx` - Tab-based navigation (images/videos/files/status)
+  - `App.tsx` - Tab-based navigation (images/videos/files/gallery/status)
   - `UploaderTab.tsx` - Reusable upload interface for different file types
+  - `ImageGallery.tsx` - Grid display of Storj images with thumbnails
+  - `ImageModal.tsx` - Full-size image viewer with zoom/download
   - `FileDropzone.tsx` - Drag & drop file selection
   - `FilePreview.tsx` - File preview (images) and info display
   - `SystemStatus.tsx` - Real-time system status and manual triggers
 - **API client**: `api.ts` with `StorjUploaderAPI` class
 - **Styling**: Tailwind CSS with mobile-first responsive design
 - **Default port**: 9010 (production), 3000 (dev)
+
+#### android_storj_uploader (Kotlin Android)
+- **Main activities**:
+  - `MainActivity.kt` - Photo grid view with upload status
+  - `SettingsActivity.kt` - Upload list and manual trigger
+  - `ImageViewerActivity.kt` - Full-size image viewer with pinch-zoom
+- **Key features**:
+  - Auto-upload every 15 minutes (WorkManager)
+  - Displays local photos with Storj upload status
+  - Fetches and displays Storj images via backend API
+  - PhotoView library for zoom/pan
+  - DownloadManager for saving images
+- **Architecture**: Repository Pattern with Retrofit + Coroutines
+- **API URL**: `http://10.0.2.2:8010/` (emulator), custom IP for real devices
+- **Build system**: Gradle with Kotlin 1.9.25, Material Design 3
 
 ## Dev Container Setup
 
@@ -80,7 +101,7 @@ code .
 ```
 
 自動的に以下がセットアップされます：
-- Python 3.11, Node.js 18, rclone, Flutter SDK
+- Python 3.11, Node.js 18, rclone
 - 全コンポーネントの依存関係（pip, npm）
 - 必要なディレクトリとテンプレート .env ファイル
 - ポートフォワーディング（8010, 9010, 3000）
@@ -89,30 +110,6 @@ code .
 ```bash
 rclone config
 cp ~/.config/rclone/rclone.conf storj_container_app/
-```
-
-### Flutter SDK の使用
-
-Flutter SDK がインストールされ、`flutter` および `flutter pub` コマンドが利用可能です：
-
-```bash
-# Flutter のバージョン確認
-flutter --version
-
-# Flutter プロジェクトの依存関係を取得
-flutter pub get
-
-# Flutter プロジェクトを作成（新規プロジェクトの場合）
-flutter create my_app
-
-# Flutter アプリを実行
-flutter run
-```
-
-**注意**: Dev Container 内では、ターミナルを新規に開いた際に Flutter の PATH が自動的に設定されます。もし `flutter` コマンドが見つからない場合は、以下のコマンドを実行してください：
-
-```bash
-export PATH="$HOME/flutter/bin:$PATH"
 ```
 
 詳細は `.devcontainer/README.md` を参照してください。
@@ -183,6 +180,66 @@ docker rmi storj_container_app-storj_container_app
 docker-compose up
 ```
 
+### Android App Development
+
+**Windows環境でのビルド:**
+```cmd
+cd android_storj_uploader
+
+# Debug APK build
+gradlew.bat assembleDebug
+
+# Release APK build
+gradlew.bat assembleRelease
+
+# Install on emulator/device
+gradlew.bat installDebug
+
+# Run tests
+gradlew.bat test
+
+# Lint check
+gradlew.bat lint
+```
+
+**Linux/Mac/Dev Container環境でのビルド:**
+```bash
+cd android_storj_uploader
+
+# Make gradlew executable
+chmod +x gradlew
+
+# Debug APK build
+./gradlew assembleDebug
+
+# Install on emulator/device
+./gradlew installDebug
+```
+
+**エミュレータでの実行:**
+```bash
+# List available emulators
+emulator -list-avds
+
+# Start emulator (別ターミナルで)
+emulator -avd Pixel_5_API_33
+
+# Install and run app
+./gradlew installDebug
+adb shell am start -n com.example.storjapp.debug/com.example.storjapp.MainActivity
+```
+
+**ログの確認:**
+```bash
+# Real-time logs
+adb logcat -s MainActivity:D PhotoRepository:D ImageViewerActivity:D
+
+# Save logs to file
+adb logcat > app_log.txt
+```
+
+詳細は `android_storj_uploader/README.md` を参照してください（Windows専用手順あり）。
+
 ## Key Configuration Files
 
 ### Backend (.env)
@@ -191,6 +248,7 @@ docker-compose up
 - `MAX_FILE_SIZE`: Max upload size in bytes (default: 100MB)
 - `API_HOST`: API server host (default: 0.0.0.0)
 - `API_PORT`: API server port (default: 8010)
+- `API_BASE_URL`: Base URL for generating image URLs (default: http://10.0.2.2:8010)
 
 ### Storj Container App (.env)
 - `STORJ_BUCKET_NAME`: Storj bucket name
@@ -201,10 +259,14 @@ docker-compose up
 ### Frontend (.env)
 - `REACT_APP_API_URL`: Backend API URL (default: http://localhost:8010)
 
+### Android App Configuration
+- **RetrofitClient.kt**: `BASE_URL = "http://10.0.2.2:8010/"` (エミュレータ用)
+- **実機の場合**: BASE_URLをPCのローカルIPに変更して再ビルド
+
 ## Important Implementation Notes
 
 ### File Upload Flow
-1. Frontend sends files to `/upload` (images) or `/upload/files` (all files)
+1. Frontend/Android sends files to `/upload` (images) or `/upload/files` (all files)
 2. Backend validates file size and format (images only for `/upload`)
 3. Backend generates unique filename with timestamp + UUID
 4. File saved to `temp/` then moved to `upload_target/` via background task
@@ -234,12 +296,21 @@ docker-compose up
 - Falls back to file creation time if pattern not found
 - Implemented in `get_file_date()` and `extract_date_from_filename()`
 
-### CORS Configuration
-Backend allows requests from:
-- http://localhost:9010 (production frontend)
-- http://localhost:3000 (development frontend)
-- http://127.0.0.1:9010
-- http://127.0.0.1:3000
+### Image URL Construction (Android App)
+- **Critical**: Backend API's `BASE_URL` has trailing slash: `"http://10.0.2.2:8010/"`
+- **Important**: Always use `trimEnd('/')` when constructing URLs to prevent double slashes
+- Example in ImageViewerActivity.kt:
+  ```kotlin
+  val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
+  val imageUrl = "$baseUrl/storj/images/$imagePath?thumbnail=false"
+  ```
+- Backend returns thumbnail/full URLs with query parameters from storj_client.py
+- Query parameter: `thumbnail=true` for thumbnails, `thumbnail=false` for full-size
+
+### Android Theme Requirements
+- ImageViewerActivity requires AppCompat-based theme
+- Use `Theme.Material3.DayNight.NoActionBar` or descendants
+- Never use `@android:style` themes with AppCompatActivity
 
 ## Testing
 
@@ -250,6 +321,9 @@ curl http://localhost:8010/health
 
 # System status
 curl http://localhost:8010/status
+
+# List Storj images
+curl http://localhost:8010/storj/images?limit=10
 
 # Upload image
 curl -X POST "http://localhost:8010/upload" -F "files=@test.jpg"
@@ -299,6 +373,12 @@ docker logs -f storj_container_app-storj_container_app-1
 - Test with: `rclone lsd storj:` (should list buckets)
 - Verify remote name matches `STORJ_REMOTE_NAME` in .env
 
+### Android Image Loading Failures (404 Errors)
+- Check for double slashes in URLs (`//storj/images`)
+- Ensure `trimEnd('/')` is used when constructing image URLs
+- Verify backend is returning proper thumbnail_url and url fields
+- Check logcat: `adb logcat | grep -E "ImageViewerActivity|PhotoRepository"`
+
 ## OpenAPI v3 Documentation
 The backend API is fully documented with OpenAPI v3:
 - Interactive docs: http://localhost:8010/docs
@@ -310,3 +390,21 @@ All endpoints have:
 - Request/response schemas (Pydantic models in `models.py`)
 - Error response examples
 - Tags for organization (images, files, system, storj)
+
+## GitHub Actions CI/CD
+
+### Android App
+- **Workflow**: `.github/workflows/android-build.yml`
+- **Triggers**: Push/PR to any branch, tag push
+- **Tasks**: Build debug APK, run tests, lint check
+- **Release**: Tag push (e.g., `v1.0.0`) creates signed release APK
+
+詳細は `android_storj_uploader/RELEASE.md` を参照してください。
+
+## Documentation Files
+
+- `android_storj_uploader/README.md` - Android app setup (Windows専用手順)
+- `android_storj_uploader/SCREEN_DESIGN.md` - 画面設計書・画面遷移図
+- `android_storj_uploader/RELEASE.md` - リリースビルドとデプロイ
+- `.devcontainer/README.md` - Dev Container setup guide
+- `.github/workflows/android-build.yml` - CI/CD configuration
