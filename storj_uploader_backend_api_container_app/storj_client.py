@@ -238,15 +238,16 @@ class StorjClient:
                 # Generate URLs for image access
                 # Use environment variable or default to localhost
                 api_base_url = os.getenv("API_BASE_URL", "http://10.0.2.2:8010")
-                image_url = f"{api_base_url}/storj/images/{path}"
+                thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
+                full_url = f"{api_base_url}/storj/images/{path}?thumbnail=false"
 
                 images.append({
                     "filename": filename,
                     "path": path,
                     "size": size,
                     "modified_time": mod_time,
-                    "thumbnail_url": image_url,  # Use same URL for thumbnail (can be optimized later)
-                    "url": image_url
+                    "thumbnail_url": thumbnail_url,
+                    "url": full_url
                 })
 
             print(f"Found {len(images)} images in Storj")

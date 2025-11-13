@@ -80,3 +80,20 @@ export interface UploadStats {
   error: number;
   pending: number;
 }
+
+// Storj画像関連の型定義
+export interface StorjImageItem {
+  filename: string;
+  path: string;
+  size: number;
+  modified_time: string;
+  thumbnail_url?: string | null;
+  url?: string | null;
+}
+
+export interface StorjImageListResponse {
+  success: boolean;
+  images: StorjImageItem[];
+  total_count: number;
+  message?: string | null;
+}

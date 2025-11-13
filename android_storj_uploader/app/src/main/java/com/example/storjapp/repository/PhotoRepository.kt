@@ -79,6 +79,11 @@ class PhotoRepository(private val context: Context) {
                 storjResponse?.images?.forEach { storjImage ->
                     // Only add if not already in local photos
                     if (!localFileNames.contains(storjImage.filename)) {
+                        // Use thumbnail URL from API response, or construct if not provided
+                        val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
+                        val thumbnailUrl = storjImage.thumbnailUrl
+                            ?: "$baseUrl/storj/images/${storjImage.path}?thumbnail=true"
+
                         photos.add(
                             PhotoItem(
                                 uri = null,
@@ -86,11 +91,12 @@ class PhotoRepository(private val context: Context) {
                                 dateAdded = 0L,
                                 isUploaded = true,
                                 thumbnailPath = null,
-                                storjUrl = storjImage.thumbnailUrl ?: storjImage.url,
+                                storjUrl = thumbnailUrl,
                                 storjPath = storjImage.path,
                                 isFromStorj = true
                             )
                         )
+                        Log.d(TAG, "Added Storj photo: ${storjImage.filename} with thumbnail URL: $thumbnailUrl")
                     }
                 }
                 Log.d(TAG, "Added ${storjResponse?.images?.size ?: 0} Storj photos")

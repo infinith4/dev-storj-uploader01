@@ -690,6 +690,12 @@ async def get_storj_image(
     Storjから画像を取得して配信
     thumbnailがtrueの場合はサムネイル（300x300px）を返す
     """
+    print(f"=== Image Request ===")
+    print(f"image_path: {image_path}")
+    print(f"thumbnail: {thumbnail}")
+    print(f"bucket: {bucket}")
+    print(f"====================")
+
     try:
         # サムネイルまたはフルサイズ画像を取得
         if thumbnail:

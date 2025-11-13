@@ -125,6 +125,12 @@ dependencies {
     // Fragment
     implementation 'androidx.fragment:fragment-ktx:1.6.2'
 
+    // PhotoView for image zoom/pan
+    implementation 'com.github.chrisbanes:PhotoView:2.3.0'
+
+    // CoordinatorLayout
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+
     // Testing
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'

@@ -1,5 +1,6 @@
 package com.example.storjapp.adapter
 
+import android.content.Intent
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -9,6 +10,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.example.storjapp.ImageViewerActivity
 import com.example.storjapp.R
 import com.example.storjapp.model.PhotoItem
 
@@ -85,6 +87,41 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
             )
         } else {
             holder.uploadBadge.visibility = View.GONE
+        }
+
+        // Set click listener to open ImageViewerActivity for Storj images
+        holder.itemView.setOnClickListener {
+            Log.d(TAG, "Item clicked - isFromStorj: ${item.isFromStorj}, storjPath: ${item.storjPath}, fileName: ${item.fileName}")
+
+            if (item.isFromStorj && item.storjPath != null) {
+                try {
+                    val context = holder.itemView.context
+                    val intent = Intent(context, ImageViewerActivity::class.java).apply {
+                        putExtra(ImageViewerActivity.EXTRA_IMAGE_PATH, item.storjPath)
+                        putExtra(ImageViewerActivity.EXTRA_IMAGE_FILENAME, item.fileName)
+                        putExtra(ImageViewerActivity.EXTRA_IMAGE_SIZE, 0L) // Size not available in PhotoItem
+                        putExtra(ImageViewerActivity.EXTRA_IMAGE_DATE, "") // Date not available in PhotoItem
+                    }
+                    context.startActivity(intent)
+                    Log.d(TAG, "Successfully opened ImageViewerActivity for: ${item.fileName}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error opening ImageViewerActivity", e)
+                    android.widget.Toast.makeText(
+                        holder.itemView.context,
+                        "画像を開けませんでした: ${e.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else if (item.isFromStorj && item.storjPath == null) {
+                Log.w(TAG, "Storj image clicked but storjPath is null: ${item.fileName}")
+                android.widget.Toast.makeText(
+                    holder.itemView.context,
+                    "画像パスが見つかりません",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                Log.d(TAG, "Local image clicked (no viewer for local images yet)")
+            }
         }
     }
 
