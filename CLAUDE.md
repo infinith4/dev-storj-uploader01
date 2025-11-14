@@ -222,7 +222,7 @@ chmod +x gradlew
 emulator -list-avds
 
 # Start emulator (別ターミナルで)
-emulator -avd Pixel_5_API_33
+emulator -avd Pixel_9a_API_33
 
 # Install and run app
 ./gradlew installDebug

@@ -45,6 +45,11 @@
             android:name=".ImageViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.StorjApp.Fullscreen" />
+        <activity
+            android:name=".VideoPlayerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StorjApp.Fullscreen"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
     </application>
 
 </manifest>

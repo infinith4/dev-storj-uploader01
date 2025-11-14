@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.storjapp.ImageViewerActivity
+import com.example.storjapp.VideoPlayerActivity
 import com.example.storjapp.R
 import com.example.storjapp.model.PhotoItem
 
@@ -106,13 +107,14 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
                     val context = holder.itemView.context
 
                     if (item.isVideo) {
-                        // TODO: Open VideoPlayerActivity when implemented
+                        // Open VideoPlayerActivity for videos
                         Log.d(TAG, "Video clicked: ${item.fileName}")
-                        android.widget.Toast.makeText(
-                            context,
-                            "動画再生機能は実装中です",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
+                        val intent = Intent(context, VideoPlayerActivity::class.java).apply {
+                            putExtra(VideoPlayerActivity.EXTRA_VIDEO_PATH, item.storjPath)
+                            putExtra(VideoPlayerActivity.EXTRA_VIDEO_FILENAME, item.fileName)
+                        }
+                        context.startActivity(intent)
+                        Log.d(TAG, "Successfully opened VideoPlayerActivity for: ${item.fileName}")
                     } else {
                         // Open ImageViewerActivity for images
                         val intent = Intent(context, ImageViewerActivity::class.java).apply {

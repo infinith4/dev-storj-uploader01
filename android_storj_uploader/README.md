@@ -73,7 +73,7 @@ gradlew.bat assembleRelease
 2. 「Open」→ `android_storj_uploader` フォルダを選択
 3. Gradle同期が完了するまで待つ
 4. ツールバーの「Device Manager」アイコンをクリック
-5. エミュレータを作成（例: Pixel 5, API 33）
+5. エミュレータを作成（例: Pixel 9a, API 33）
 6. ツールバーの「▶」（Run）ボタンをクリック
 7. エミュレータを選択して実行
 
@@ -86,7 +86,7 @@ emulator -list-avds
 
 **2. エミュレータを起動（別のコマンドプロンプトで）:**
 ```cmd
-emulator -avd Pixel_5_API_33
+emulator -avd Pixel_9a_API_33
 ```
 
 **3. アプリをインストールして実行:**
