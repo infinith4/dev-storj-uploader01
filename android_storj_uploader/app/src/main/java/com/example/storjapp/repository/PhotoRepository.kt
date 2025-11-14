@@ -27,28 +27,28 @@ class PhotoRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /**
-     * Get all photos with upload status (local + Storj)
+     * Get all photos and videos with upload status (local + Storj)
      */
     suspend fun getAllPhotosWithStatus(): List<PhotoItem> = withContext(Dispatchers.IO) {
         val photos = mutableListOf<PhotoItem>()
         val uploadedPhotos = getUploadedPhotoUris()
         val localFileNames = mutableSetOf<String>()
 
-        val projection = arrayOf(
+        // Get local photos
+        val imageProjection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_ADDED
         )
 
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        val imageSortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
-        // Get local photos
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
+            imageProjection,
             null,
             null,
-            sortOrder
+            imageSortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
@@ -64,12 +64,49 @@ class PhotoRepository(private val context: Context) {
                 )
 
                 val isUploaded = uploadedPhotos.contains(uri.toString())
-                photos.add(PhotoItem(uri, name, dateAdded, isUploaded))
+                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = false))
                 localFileNames.add(name)
             }
         }
 
         Log.d(TAG, "Found ${photos.size} local photos (${photos.count { it.isUploaded }} uploaded)")
+
+        // Get local videos
+        val videoProjection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.DATE_ADDED
+        )
+
+        val videoSortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
+
+        context.contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            videoProjection,
+            null,
+            null,
+            videoSortOrder
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+            val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val name = cursor.getString(nameColumn)
+                val dateAdded = cursor.getLong(dateColumn)
+                val uri = Uri.withAppendedPath(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    id.toString()
+                )
+
+                val isUploaded = uploadedPhotos.contains(uri.toString())
+                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = true))
+                localFileNames.add(name)
+            }
+        }
+
+        Log.d(TAG, "Found ${photos.size} local media files (photos + videos, ${photos.count { it.isUploaded }} uploaded)")
 
         // Get Storj photos
         try {

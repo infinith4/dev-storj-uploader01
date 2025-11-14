@@ -60,7 +60,7 @@ gradlew.bat assembleDebug
 
 **リリースAPKの生成:**
 ```cmd
-gradlew.bat assembleRelease
+.\gradlew.bat assembleRelease
 ```
 
 生成されたAPK: `app\build\outputs\apk\release\app-release.apk`
@@ -91,7 +91,7 @@ emulator -avd Pixel_9a_API_33
 
 **3. アプリをインストールして実行:**
 ```cmd
-gradlew.bat installDebug
+.\gradlew.bat installDebug
 adb shell am start -n com.example.storjapp.debug/com.example.storjapp.MainActivity
 ```
 

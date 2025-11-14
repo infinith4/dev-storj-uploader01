@@ -46,7 +46,7 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
             item.storjUrl
         }
 
-        Log.d(TAG, "Loading image at position $adapterPosition: uri=${item.uri}, storjUrl=${item.storjUrl}, source=$imageSource")
+        Log.d(TAG, "Loading media at position $adapterPosition: uri=${item.uri}, storjUrl=${item.storjUrl}, isVideo=${item.isVideo}, isFromStorj=${item.isFromStorj}")
 
         Glide.with(holder.itemView.context)
             .load(imageSource)
@@ -100,7 +100,7 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
 
         // Set click listener to open ImageViewerActivity or VideoPlayerActivity
         holder.itemView.setOnClickListener {
-            Log.d(TAG, "Item clicked - isFromStorj: ${item.isFromStorj}, storjPath: ${item.storjPath}, fileName: ${item.fileName}")
+            Log.d(TAG, "Item clicked - isFromStorj: ${item.isFromStorj}, isVideo: ${item.isVideo}, storjPath: ${item.storjPath}, uri: ${item.uri}, fileName: ${item.fileName}")
 
             if (item.isFromStorj && item.storjPath != null) {
                 try {
@@ -141,8 +141,34 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
                     "画像パスが見つかりません",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
+            } else if (!item.isFromStorj && item.uri != null) {
+                // Handle local media (photos/videos)
+                try {
+                    val context = holder.itemView.context
+
+                    if (item.isVideo) {
+                        // Open VideoPlayerActivity for local videos
+                        Log.d(TAG, "Local video clicked: ${item.fileName}")
+                        val intent = Intent(context, VideoPlayerActivity::class.java).apply {
+                            putExtra(VideoPlayerActivity.EXTRA_VIDEO_PATH, item.uri.toString())
+                            putExtra(VideoPlayerActivity.EXTRA_VIDEO_FILENAME, item.fileName)
+                        }
+                        context.startActivity(intent)
+                        Log.d(TAG, "Successfully opened VideoPlayerActivity for local video: ${item.fileName}")
+                    } else {
+                        // Local photo clicked - no viewer yet
+                        Log.d(TAG, "Local photo clicked (no viewer for local photos yet)")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error opening local media viewer", e)
+                    android.widget.Toast.makeText(
+                        holder.itemView.context,
+                        "ファイルを開けませんでした: ${e.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             } else {
-                Log.d(TAG, "Local image clicked (no viewer for local images yet)")
+                Log.d(TAG, "Item clicked but no valid path or URI")
             }
         }
     }

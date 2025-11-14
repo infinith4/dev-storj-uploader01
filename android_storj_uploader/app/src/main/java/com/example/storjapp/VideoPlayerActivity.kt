@@ -79,15 +79,24 @@ class VideoPlayerActivity : AppCompatActivity() {
         loadingProgress.visibility = View.VISIBLE
         errorText.visibility = View.GONE
 
-        // Construct video URL
-        val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
-        val videoUrl = "$baseUrl/storj/images/$videoPath?thumbnail=false"
-
-        Log.d(TAG, "=== Video Load Details ===")
-        Log.d(TAG, "videoPath: $videoPath")
-        Log.d(TAG, "baseUrl (trimmed): $baseUrl")
-        Log.d(TAG, "Full videoUrl: $videoUrl")
-        Log.d(TAG, "=========================")
+        // Check if this is a local URI or Storj path
+        val videoUrl = if (videoPath!!.startsWith("content://")) {
+            // Local video URI
+            Log.d(TAG, "=== Local Video Load ===")
+            Log.d(TAG, "videoUri: $videoPath")
+            Log.d(TAG, "========================")
+            videoPath!!
+        } else {
+            // Storj video - construct URL
+            val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
+            val url = "$baseUrl/storj/images/$videoPath?thumbnail=false"
+            Log.d(TAG, "=== Storj Video Load ===")
+            Log.d(TAG, "videoPath: $videoPath")
+            Log.d(TAG, "baseUrl (trimmed): $baseUrl")
+            Log.d(TAG, "Full videoUrl: $url")
+            Log.d(TAG, "========================")
+            url
+        }
 
         try {
             initializePlayer(videoUrl)
@@ -153,8 +162,12 @@ class VideoPlayerActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         if (player == null && videoPath != null) {
-            val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
-            val videoUrl = "$baseUrl/storj/images/$videoPath?thumbnail=false"
+            val videoUrl = if (videoPath!!.startsWith("content://")) {
+                videoPath!!
+            } else {
+                val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
+                "$baseUrl/storj/images/$videoPath?thumbnail=false"
+            }
             initializePlayer(videoUrl)
         }
     }
