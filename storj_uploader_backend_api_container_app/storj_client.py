@@ -229,11 +229,15 @@ class StorjClient:
                 path, size_str, mod_time = parts
                 filename = path.split('/')[-1]
 
-                # Check if this is a thumbnail file (ends with _thumb.jpg)
-                if filename.lower().endswith('_thumb.jpg'):
-                    # Extract the video stem (remove _thumb.jpg)
-                    video_stem = filename[:-10]  # Remove "_thumb.jpg"
-                    thumbnails[video_stem.lower()] = path
+                # Check if this is a thumbnail file (contains _thumb_)
+                if '_thumb_' in filename.lower() or filename.lower().endswith('_thumb.jpg'):
+                    # Extract the video stem (remove _thumb_hash.jpg or _thumb.jpg)
+                    # For files like: VID_20251114_053243_20251114_065302_d50f7d78_thumb_a0fc57649b.jpg
+                    # We want to match with: VID_20251114_053243_20251114_065302_d50f7d78.mp4
+                    thumb_index = filename.lower().find('_thumb')
+                    if thumb_index > 0:
+                        video_stem = filename[:thumb_index]
+                        thumbnails[video_stem.lower()] = path
 
                 # Collect all media files (images and videos)
                 if path.lower().endswith(image_extensions) or path.lower().endswith(video_extensions):
@@ -243,8 +247,8 @@ class StorjClient:
             for path, size_str, mod_time in all_files:
                 filename = path.split('/')[-1]
 
-                # Skip thumbnail files from the main list
-                if filename.lower().endswith('_thumb.jpg'):
+                # Skip thumbnail files from the main list (contains _thumb_)
+                if '_thumb_' in filename.lower() or filename.lower().endswith('_thumb.jpg'):
                     continue
 
                 try:
