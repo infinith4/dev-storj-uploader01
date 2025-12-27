@@ -19,6 +19,8 @@ param containerRegistryPassword = ''
 param deployAcr = false
 param acrSku = 'Basic'
 param acrAdminUserEnabled = true
+// GitHub Actions のアプリ (service principal) の objectId を指定
+param acrPushPrincipalId = ''
 
 // Managed Identity を使う場合は true にし、上記レジストリ資格情報は空でOK
 param enableManagedIdentity = false

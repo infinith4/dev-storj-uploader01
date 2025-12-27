@@ -10,6 +10,9 @@ param sku string = 'Basic'
 @description('Enable admin user for username/password auth')
 param adminUserEnabled bool = true
 
+@description('Principal ID (objectId) to grant AcrPush on this ACR. Leave empty to skip.')
+param acrPushPrincipalId string = ''
+
 resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
   name: registryName
   location: location
@@ -18,6 +21,16 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = 
   }
   properties: {
     adminUserEnabled: adminUserEnabled
+  }
+}
+
+resource acrPushAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(acrPushPrincipalId)) {
+  name: guid(registry.id, acrPushPrincipalId, 'AcrPush')
+  scope: registry
+  properties: {
+    principalId: acrPushPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalType: 'ServicePrincipal'
   }
 }
 
