@@ -79,12 +79,12 @@
 ```bash
 # リソースグループ作成
 az group create \
-  --name rg-storj-uploader \
+  --name rg-dev-storjup \
   --location japaneast
 
 # ACR 作成 (Basic SKU - 最小コスト)
 az acr create \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <your-acr-name> \
   --sku Basic \
   --location japaneast
@@ -159,13 +159,13 @@ cd infrastructure
 
 # デプロイメントの検証 (Dry run)
 az deployment group what-if \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --template-file main.bicep \
   --parameters main.bicepparam
 
 # デプロイメント実行
 az deployment group create \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --template-file main.bicep \
   --parameters main.bicepparam \
   --name storj-uploader-deployment
@@ -176,20 +176,20 @@ az deployment group create \
 ```bash
 # デプロイメント出力の取得
 az deployment group show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name storj-uploader-deployment \
   --query properties.outputs
 
 # Frontend URL
 az deployment group show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name storj-uploader-deployment \
   --query properties.outputs.frontendUrl.value \
   --output tsv
 
 # Backend API URL
 az deployment group show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name storj-uploader-deployment \
   --query properties.outputs.backendApiUrl.value \
   --output tsv
@@ -215,7 +215,7 @@ ACR_ID=$(az acr show --name $ACR_NAME --query id --output tsv)
 
 # Backend API
 BACKEND_PRINCIPAL_ID=$(az containerapp show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <backend-app-name> \
   --query identity.principalId \
   --output tsv)
@@ -244,13 +244,13 @@ identity: {
 ```bash
 # Backend API のログ
 az containerapp logs show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <backend-app-name> \
   --follow
 
 # Storj Uploader のログ
 az containerapp logs show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <storj-app-name> \
   --follow
 ```
@@ -267,7 +267,7 @@ az acr build \
 
 # Container App を更新
 az containerapp update \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <backend-app-name> \
   --image $ACR_NAME.azurecr.io/storj-backend:v2
 ```
@@ -278,7 +278,7 @@ az containerapp update \
 
 ```bash
 az containerapp update \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <backend-app-name> \
   --cpu 0.5 \
   --memory 1.0Gi
@@ -300,17 +300,17 @@ az storage share stats \
 ```bash
 # Container App の詳細を確認
 az containerapp show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <app-name>
 
 # リビジョン履歴を確認
 az containerapp revision list \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <app-name>
 
 # 失敗したリビジョンの詳細
 az containerapp revision show \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <app-name> \
   --revision <revision-name>
 ```
@@ -323,7 +323,7 @@ az containerapp revision show \
 
 ```bash
 az containerapp env storage list \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <environment-name>
 ```
 
@@ -350,7 +350,7 @@ az containerapp env storage list \
 1. **使用しない時間帯にスケールダウン**
    ```bash
    az containerapp update \
-     --resource-group rg-storj-uploader \
+     --resource-group rg-dev-storjup \
      --name <app-name> \
      --min-replicas 0 \
      --max-replicas 1
@@ -359,7 +359,7 @@ az containerapp env storage list \
 2. **Log Analytics の保持期間を短縮**
    ```bash
    az monitor log-analytics workspace update \
-     --resource-group rg-storj-uploader \
+     --resource-group rg-dev-storjup \
      --workspace-name <workspace-name> \
      --retention-time 7
    ```
@@ -375,7 +375,7 @@ az containerapp env storage list \
 ```bash
 # Key Vault の作成
 az keyvault create \
-  --resource-group rg-storj-uploader \
+  --resource-group rg-dev-storjup \
   --name <keyvault-name> \
   --location japaneast
 

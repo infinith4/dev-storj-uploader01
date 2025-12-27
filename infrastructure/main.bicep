@@ -25,6 +25,15 @@ param containerRegistryUsername string = ''
 @secure()
 param containerRegistryPassword string = ''
 
+@description('Deploy Azure Container Registry (ACR)')
+param deployAcr bool = false
+
+@description('ACR SKU (Basic, Standard, Premium)')
+param acrSku string = 'Basic'
+
+@description('Enable admin user for ACR (required for username/password auth)')
+param acrAdminUserEnabled bool = true
+
 @description('Enable system-assigned managed identity for Container Apps')
 param enableManagedIdentity bool = false
 
@@ -52,6 +61,7 @@ var uniqueSuffix = uniqueString(resourceGroup().id)
 var logAnalyticsName = '${baseName}-logs-${uniqueSuffix}'
 var environmentName = '${baseName}-env-${uniqueSuffix}'
 var storageAccountName = '${baseName}st${uniqueSuffix}'
+var acrName = toLower(replace('${baseName}acr${uniqueSuffix}', '-', ''))
 var backendAppName = '${baseName}-backend-${uniqueSuffix}'
 var frontendAppName = '${baseName}-frontend-${uniqueSuffix}'
 var storjAppName = '${baseName}-storj-${uniqueSuffix}'
@@ -75,6 +85,21 @@ module environment 'modules/environment.bicep' = {
   }
 }
 
+// Azure Container Registry (optional)
+module acr 'modules/acr.bicep' = if (deployAcr) {
+  name: 'acr'
+  params: {
+    registryName: acrName
+    location: location
+    sku: acrSku
+    adminUserEnabled: acrAdminUserEnabled
+  }
+}
+
+var resolvedRegistryServer = deployAcr ? acr.outputs.loginServer : containerRegistryServer
+var resolvedRegistryUsername = deployAcr ? acr.outputs.username : containerRegistryUsername
+var resolvedRegistryPassword = deployAcr ? acr.outputs.password : containerRegistryPassword
+
 // Storage Account with File Shares
 module storage 'modules/storage.bicep' = {
   name: 'storage'
@@ -92,7 +117,7 @@ module storage 'modules/storage.bicep' = {
 
 // Storage configuration for Container Apps Environment
 resource storageConfig 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
-  name: '${environment.outputs.environmentName}/upload-target'
+  name: '${environmentName}/upload-target'
   properties: {
     azureFile: {
       accountName: storage.outputs.storageAccountName
@@ -101,10 +126,13 @@ resource storageConfig 'Microsoft.App/managedEnvironments/storages@2023-05-01' =
       accessMode: 'ReadWrite'
     }
   }
+  dependsOn: [
+    environment
+  ]
 }
 
 resource storageConfigUploaded 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
-  name: '${environment.outputs.environmentName}/uploaded'
+  name: '${environmentName}/uploaded'
   properties: {
     azureFile: {
       accountName: storage.outputs.storageAccountName
@@ -113,10 +141,13 @@ resource storageConfigUploaded 'Microsoft.App/managedEnvironments/storages@2023-
       accessMode: 'ReadWrite'
     }
   }
+  dependsOn: [
+    environment
+  ]
 }
 
 resource storageConfigTemp 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
-  name: '${environment.outputs.environmentName}/temp'
+  name: '${environmentName}/temp'
   properties: {
     azureFile: {
       accountName: storage.outputs.storageAccountName
@@ -125,10 +156,13 @@ resource storageConfigTemp 'Microsoft.App/managedEnvironments/storages@2023-05-0
       accessMode: 'ReadWrite'
     }
   }
+  dependsOn: [
+    environment
+  ]
 }
 
 resource storageConfigThumbnail 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
-  name: '${environment.outputs.environmentName}/thumbnail-cache'
+  name: '${environmentName}/thumbnail-cache'
   properties: {
     azureFile: {
       accountName: storage.outputs.storageAccountName
@@ -137,6 +171,9 @@ resource storageConfigThumbnail 'Microsoft.App/managedEnvironments/storages@2023
       accessMode: 'ReadWrite'
     }
   }
+  dependsOn: [
+    environment
+  ]
 }
 
 // Backend API Container App
@@ -148,10 +185,9 @@ module backendApi 'modules/backend-api.bicep' = {
     environmentId: environment.outputs.environmentId
     containerImage: backendContainerImage
     enableManagedIdentity: enableManagedIdentity
-    containerRegistryServer: containerRegistryServer
-    containerRegistryUsername: containerRegistryUsername
-    containerRegistryPassword: containerRegistryPassword
-    storageAccountName: storage.outputs.storageAccountName
+    containerRegistryServer: resolvedRegistryServer
+    containerRegistryUsername: resolvedRegistryUsername
+    containerRegistryPassword: resolvedRegistryPassword
     storageAccountKey: storage.outputs.storageAccountKey
     storjBucketName: storjBucketName
     storjRemoteName: storjRemoteName
@@ -175,10 +211,9 @@ module storjUploader 'modules/storj-uploader.bicep' = {
     environmentId: environment.outputs.environmentId
     containerImage: storjContainerImage
     enableManagedIdentity: enableManagedIdentity
-    containerRegistryServer: containerRegistryServer
-    containerRegistryUsername: containerRegistryUsername
-    containerRegistryPassword: containerRegistryPassword
-    storageAccountName: storage.outputs.storageAccountName
+    containerRegistryServer: resolvedRegistryServer
+    containerRegistryUsername: resolvedRegistryUsername
+    containerRegistryPassword: resolvedRegistryPassword
     storageAccountKey: storage.outputs.storageAccountKey
     storjBucketName: storjBucketName
     storjRemoteName: storjRemoteName
@@ -201,9 +236,9 @@ module frontend 'modules/frontend.bicep' = {
     environmentId: environment.outputs.environmentId
     containerImage: frontendContainerImage
     enableManagedIdentity: enableManagedIdentity
-    containerRegistryServer: containerRegistryServer
-    containerRegistryUsername: containerRegistryUsername
-    containerRegistryPassword: containerRegistryPassword
+    containerRegistryServer: resolvedRegistryServer
+    containerRegistryUsername: resolvedRegistryUsername
+    containerRegistryPassword: resolvedRegistryPassword
     backendApiUrl: 'https://${backendApi.outputs.fqdn}'
   }
 }
@@ -214,3 +249,5 @@ output frontendUrl string = 'https://${frontend.outputs.fqdn}'
 output storageAccountName string = storage.outputs.storageAccountName
 output environmentName string = environment.outputs.environmentName
 output resourceGroupName string = resourceGroup().name
+output acrName string = deployAcr ? acrName : ''
+output acrLoginServer string = resolvedRegistryServer

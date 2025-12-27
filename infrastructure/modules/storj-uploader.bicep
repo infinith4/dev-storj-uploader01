@@ -23,9 +23,6 @@ param containerRegistryUsername string = ''
 @secure()
 param containerRegistryPassword string = ''
 
-@description('Storage Account Name')
-param storageAccountName string
-
 @description('Storage Account Key')
 @secure()
 param storageAccountKey string
@@ -49,10 +46,13 @@ param rcloneConfig string
 resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
+  identity: enableManagedIdentity ? {
+    type: 'SystemAssigned'
+  } : null
   properties: {
     environmentId: environmentId
     configuration: {
-      secrets: [
+      secrets: concat([
         {
           name: 'storage-key'
           value: storageAccountKey
@@ -61,11 +61,12 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'rclone-config'
           value: rcloneConfig
         }
-        if (!empty(containerRegistryPassword)) {
+      ], empty(containerRegistryPassword) ? [] : [
+        {
           name: 'registry-password'
           value: containerRegistryPassword
         }
-      ]
+      ])
       registries: empty(containerRegistryServer) ? [] : [
         {
           server: containerRegistryServer
@@ -74,9 +75,6 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
     }
-    identity: enableManagedIdentity ? {
-      type: 'SystemAssigned'
-    } : null
     template: {
       containers: [
         {

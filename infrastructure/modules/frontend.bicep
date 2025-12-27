@@ -29,6 +29,9 @@ param backendApiUrl string
 resource frontend 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
+  identity: enableManagedIdentity ? {
+    type: 'SystemAssigned'
+  } : null
   properties: {
     environmentId: environmentId
     configuration: {
@@ -52,9 +55,6 @@ resource frontend 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
     }
-    identity: enableManagedIdentity ? {
-      type: 'SystemAssigned'
-    } : null
     template: {
       containers: [
         {

@@ -11,6 +11,15 @@ sudo apt-get update
 echo "Installing system dependencies..."
 sudo apt-get install -y curl wget git build-essential
 
+# Install Azure CLI (includes Bicep CLI)
+echo "Installing Azure CLI..."
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# Ensure latest Bicep CLI
+echo "Ensuring Bicep CLI is installed..."
+az bicep install
+az bicep version
+
 # Install rclone
 echo "Installing rclone..."
 curl https://rclone.org/install.sh | sudo bash
