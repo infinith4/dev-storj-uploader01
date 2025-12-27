@@ -69,6 +69,10 @@ resource frontend 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'REACT_APP_API_URL'
               value: backendApiUrl
             }
+            {
+              name: 'BACKEND_URL'
+              value: backendApiUrl
+            }
           ]
         }
       ]
