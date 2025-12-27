@@ -100,6 +100,18 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    location /storj/ {
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Handle large image responses
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
     # Cache static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
         expires 1y;
