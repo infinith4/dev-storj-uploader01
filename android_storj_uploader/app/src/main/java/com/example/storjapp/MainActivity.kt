@@ -46,20 +46,22 @@ class MainActivity : AppCompatActivity() {
     private var permissionChecked = false
     private var healthCheckJob: kotlinx.coroutines.Job? = null
 
-    // Permission launcher
+    // Permission launcher for multiple permissions
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Log.d(TAG, "Permission granted")
-            updateStatus("Permission granted")
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            Log.d(TAG, "All permissions granted")
+            updateStatus("Permissions granted")
             setupAutoUpload()
         } else {
-            Log.e(TAG, "Permission denied")
-            updateStatus("Permission denied - Cannot access photos")
+            val deniedPermissions = permissions.filterValues { !it }.keys
+            Log.e(TAG, "Permissions denied: $deniedPermissions")
+            updateStatus("Permission denied - Cannot access media")
             Toast.makeText(
                 this,
-                "Photo access permission is required for auto-upload",
+                "Photo and video access permissions are required for auto-upload",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -146,23 +148,43 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun checkAndRequestPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires separate permissions for images and videos
+            val imagePermission = Manifest.permission.READ_MEDIA_IMAGES
+            val videoPermission = Manifest.permission.READ_MEDIA_VIDEO
 
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                permission
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                Log.d(TAG, "Permission already granted")
-                updateStatus("Ready - Auto-upload active")
-                setupAutoUpload()
+            val imageGranted = ContextCompat.checkSelfPermission(this, imagePermission) == PackageManager.PERMISSION_GRANTED
+            val videoGranted = ContextCompat.checkSelfPermission(this, videoPermission) == PackageManager.PERMISSION_GRANTED
+
+            when {
+                imageGranted && videoGranted -> {
+                    Log.d(TAG, "Both image and video permissions already granted")
+                    updateStatus("Ready - Auto-upload active")
+                    setupAutoUpload()
+                }
+                else -> {
+                    // Request both permissions
+                    val permissionsToRequest = mutableListOf<String>()
+                    if (!imageGranted) permissionsToRequest.add(imagePermission)
+                    if (!videoGranted) permissionsToRequest.add(videoPermission)
+
+                    Log.d(TAG, "Requesting permissions: $permissionsToRequest")
+                    requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+                }
             }
-            else -> {
-                requestPermissionLauncher.launch(permission)
+        } else {
+            // Android 12 and below
+            val permission = Manifest.permission.READ_EXTERNAL_STORAGE
+            when {
+                ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
+                    Log.d(TAG, "Storage permission already granted")
+                    updateStatus("Ready - Auto-upload active")
+                    setupAutoUpload()
+                }
+                else -> {
+                    Log.d(TAG, "Requesting permission: $permission")
+                    requestPermissionLauncher.launch(arrayOf(permission))
+                }
             }
         }
     }

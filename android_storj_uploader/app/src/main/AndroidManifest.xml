@@ -6,9 +6,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Photo access permissions -->
+    <!-- Photo and Video access permissions -->
     <!-- For Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <!-- For Android 12 and below (API 32 and below) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -45,6 +46,11 @@
             android:name=".ImageViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.StorjApp.Fullscreen" />
+        <activity
+            android:name=".VideoPlayerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StorjApp.Fullscreen"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
     </application>
 
 </manifest>

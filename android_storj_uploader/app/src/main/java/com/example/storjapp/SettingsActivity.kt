@@ -63,7 +63,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun uploadPhotosManually() {
         uploadNowButton.isEnabled = false
-        updateStatus("Uploading photos...")
+        updateStatus("Uploading media files...")
         showProgress(true)
 
         lifecycleScope.launch {
@@ -71,10 +71,10 @@ class SettingsActivity : AppCompatActivity() {
                 val recentPhotos = photoRepository.getRecentPhotos(24)
 
                 if (recentPhotos.isEmpty()) {
-                    updateStatus("No recent photos to upload")
+                    updateStatus("No recent media files to upload")
                     Toast.makeText(
                         this@SettingsActivity,
-                        "No photos found from last 24 hours",
+                        "No media files (photos/videos) found from last 24 hours",
                         Toast.LENGTH_SHORT
                     ).show()
                     uploadNowButton.isEnabled = true
@@ -103,10 +103,10 @@ class SettingsActivity : AppCompatActivity() {
                 }
 
                 if (uploadedCount > 0) {
-                    updateStatus("Upload successful: $uploadedCount photos uploaded")
+                    updateStatus("Upload successful: $uploadedCount media files uploaded")
                     Toast.makeText(
                         this@SettingsActivity,
-                        "Uploaded $uploadedCount of $totalPhotos photos",
+                        "Uploaded $uploadedCount of $totalPhotos media files",
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
@@ -150,7 +150,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateProgressText(uploaded: Int, total: Int) {
-        progressText.text = "$uploaded / $total photos uploaded"
+        progressText.text = "$uploaded / $total media files uploaded"
     }
 
     private fun showSettingsMenu(view: View) {

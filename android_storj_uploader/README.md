@@ -60,7 +60,7 @@ gradlew.bat assembleDebug
 
 **リリースAPKの生成:**
 ```cmd
-gradlew.bat assembleRelease
+.\gradlew.bat assembleRelease
 ```
 
 生成されたAPK: `app\build\outputs\apk\release\app-release.apk`
@@ -73,7 +73,7 @@ gradlew.bat assembleRelease
 2. 「Open」→ `android_storj_uploader` フォルダを選択
 3. Gradle同期が完了するまで待つ
 4. ツールバーの「Device Manager」アイコンをクリック
-5. エミュレータを作成（例: Pixel 5, API 33）
+5. エミュレータを作成（例: Pixel 9a, API 33）
 6. ツールバーの「▶」（Run）ボタンをクリック
 7. エミュレータを選択して実行
 
@@ -86,12 +86,12 @@ emulator -list-avds
 
 **2. エミュレータを起動（別のコマンドプロンプトで）:**
 ```cmd
-emulator -avd Pixel_5_API_33
+emulator -avd Pixel_9a_API_33
 ```
 
 **3. アプリをインストールして実行:**
 ```cmd
-gradlew.bat installDebug
+.\gradlew.bat installDebug
 adb shell am start -n com.example.storjapp.debug/com.example.storjapp.MainActivity
 ```
 
@@ -142,17 +142,36 @@ python main.py
 
 #### 2. API接続設定
 
-**エミュレータの場合:**
-- API URL: `http://10.0.2.2:8010` （自動設定済み）
+API Base URLは `local.properties` ファイルで設定します。
+
+**エミュレータの場合（デフォルト）:**
+- `local.properties` の `api.base.url` をコメントアウトするか、削除
+- デフォルトで `http://10.0.2.2:8010/` が使用されます
 - 特別なIP: エミュレータからホストの localhost にアクセスするため
 
 **実機の場合:**
-- PCのIPアドレスを確認: `ipconfig`（例: 192.168.1.100）
-- `app\src\main\java\com\example\storjapp\api\RetrofitClient.kt` を編集:
-  ```kotlin
-  const val BASE_URL = "http://192.168.1.100:8010/"
-  ```
-- アプリを再ビルド・インストール
+1. PCのローカルIPアドレスを確認:
+   ```cmd
+   ipconfig
+   ```
+   例: `192.168.0.242`
+
+2. `android_storj_uploader/local.properties` を編集:
+   ```properties
+   api.base.url=http://192.168.0.242:8010/
+   ```
+   （YOUR_PC_IPの部分を実際のIPアドレスに置き換え）
+
+3. アプリを再ビルド・インストール:
+   ```cmd
+   gradlew.bat assembleDebug
+   gradlew.bat installDebug
+   ```
+
+**注意事項:**
+- PCと実機が同じWi-Fiネットワークに接続されている必要があります
+- `local.properties` はgitignore済みなので、チーム開発でも各自が独自に設定可能
+- テンプレートは `local.properties.example` を参照
 
 #### 3. アプリの初回起動
 

@@ -23,34 +23,34 @@ class PhotoUploadWorker(
         applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     override suspend fun doWork(): Result {
-        Log.d(TAG, "Starting photo upload work...")
+        Log.d(TAG, "Starting media upload work...")
 
         return try {
             val currentTime = System.currentTimeMillis()
 
-            // Get recent photos (last 24 hours)
+            // Get recent media files (photos and videos, last 24 hours)
             val recentPhotos = photoRepository.getRecentPhotos(24)
 
             if (recentPhotos.isEmpty()) {
-                Log.d(TAG, "No recent photos to upload")
+                Log.d(TAG, "No recent media files to upload")
                 return Result.success()
             }
 
-            Log.d(TAG, "Found ${recentPhotos.size} recent photos to upload")
+            Log.d(TAG, "Found ${recentPhotos.size} recent media files to upload")
 
-            // Upload photos in batches of 10
+            // Upload media files in batches of 10
             val batchSize = 10
             val batches = recentPhotos.chunked(batchSize)
             var successCount = 0
             var failureCount = 0
 
             for ((index, batch) in batches.withIndex()) {
-                Log.d(TAG, "Uploading batch ${index + 1}/${batches.size} (${batch.size} photos)")
+                Log.d(TAG, "Uploading batch ${index + 1}/${batches.size} (${batch.size} media files)")
 
                 val result = photoRepository.uploadPhotos(batch)
 
                 if (result.isSuccess) {
-                    // Mark photos as uploaded
+                    // Mark media files as uploaded
                     photoRepository.markPhotosAsUploaded(batch)
                     successCount += batch.size
                     Log.d(TAG, "Batch ${index + 1} uploaded successfully")

@@ -1,0 +1,8 @@
+# Bicep generated files
+*.json
+
+# Exclude main.bicepparam as it may contain secrets
+main.bicepparam
+
+# Allow keeping example parameter file
+!main.bicepparam.example

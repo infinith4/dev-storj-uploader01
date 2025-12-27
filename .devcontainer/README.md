@@ -79,6 +79,7 @@ python3 storj_uploader.py
 - Node.js 18
 - Docker-in-Docker
 - Git
+- Azure CLI + Bicep CLI
 - rclone
 - pip パッケージ（requirements.txt から）
 - npm パッケージ（package.json から）
@@ -130,3 +131,12 @@ cd ../storj_uploader_frontend_container_app && npm install
 
 1. コマンドパレットを開く
 2. "Dev Containers: Rebuild Container" を選択
+
+### Bicep/Azure CLI が見つからない場合
+
+```bash
+# setup.sh を手動で再実行
+bash .devcontainer/setup.sh
+
+# それでも解決しない場合は devcontainer の再ビルドを実施
+```

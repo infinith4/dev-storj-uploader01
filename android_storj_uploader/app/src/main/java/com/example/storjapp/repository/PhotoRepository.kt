@@ -27,49 +27,102 @@ class PhotoRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /**
-     * Get all photos with upload status (local + Storj)
+     * Get all photos and videos with upload status (local + Storj)
      */
     suspend fun getAllPhotosWithStatus(): List<PhotoItem> = withContext(Dispatchers.IO) {
         val photos = mutableListOf<PhotoItem>()
         val uploadedPhotos = getUploadedPhotoUris()
         val localFileNames = mutableSetOf<String>()
 
-        val projection = arrayOf(
+        // Get local photos (Camera folder only)
+        val imageProjection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_ADDED
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
         )
 
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        val imageSortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
-        // Get local photos
+        // Filter: Only files from Camera folder (DCIM/Camera, Screenshots, etc.)
+        val imageSelection = "${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN (?, ?, ?)"
+        val imageSelectionArgs = arrayOf("Camera", "カメラ", "Screenshots")
+
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            null,
-            null,
-            sortOrder
+            imageProjection,
+            imageSelection,
+            imageSelectionArgs,
+            imageSortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn)
                 val dateAdded = cursor.getLong(dateColumn)
+                val size = cursor.getLong(sizeColumn)
                 val uri = Uri.withAppendedPath(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     id.toString()
                 )
 
                 val isUploaded = uploadedPhotos.contains(uri.toString())
-                photos.add(PhotoItem(uri, name, dateAdded, isUploaded))
+                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = false, size = size))
                 localFileNames.add(name)
             }
         }
 
         Log.d(TAG, "Found ${photos.size} local photos (${photos.count { it.isUploaded }} uploaded)")
+
+        // Get local videos (Camera folder only)
+        val videoProjection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.DATE_ADDED,
+            MediaStore.Video.Media.SIZE,
+            MediaStore.Video.Media.BUCKET_DISPLAY_NAME
+        )
+
+        val videoSortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
+
+        // Filter: Only files from Camera folder
+        val videoSelection = "${MediaStore.Video.Media.BUCKET_DISPLAY_NAME} IN (?, ?)"
+        val videoSelectionArgs = arrayOf("Camera", "カメラ")
+
+        context.contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            videoProjection,
+            videoSelection,
+            videoSelectionArgs,
+            videoSortOrder
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+            val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val name = cursor.getString(nameColumn)
+                val dateAdded = cursor.getLong(dateColumn)
+                val size = cursor.getLong(sizeColumn)
+                val uri = Uri.withAppendedPath(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    id.toString()
+                )
+
+                val isUploaded = uploadedPhotos.contains(uri.toString())
+                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = true, size = size))
+                localFileNames.add(name)
+            }
+        }
+
+        Log.d(TAG, "Found ${photos.size} local media files (photos + videos, ${photos.count { it.isUploaded }} uploaded)")
 
         // Get Storj photos
         try {
@@ -93,10 +146,13 @@ class PhotoRepository(private val context: Context) {
                                 thumbnailPath = null,
                                 storjUrl = thumbnailUrl,
                                 storjPath = storjImage.path,
-                                isFromStorj = true
+                                isFromStorj = true,
+                                isVideo = storjImage.isVideo,
+                                size = storjImage.size
                             )
                         )
-                        Log.d(TAG, "Added Storj photo: ${storjImage.filename} with thumbnail URL: $thumbnailUrl")
+                        val mediaType = if (storjImage.isVideo) "video" else "photo"
+                        Log.d(TAG, "Added Storj $mediaType: ${storjImage.filename} with thumbnail URL: $thumbnailUrl")
                     }
                 }
                 Log.d(TAG, "Added ${storjResponse?.images?.size ?: 0} Storj photos")
@@ -112,23 +168,28 @@ class PhotoRepository(private val context: Context) {
     }
 
     /**
-     * Get all photos from device
+     * Get all photos from device (Camera folder only)
      */
     suspend fun getAllPhotos(): List<Uri> = withContext(Dispatchers.IO) {
         val photos = mutableListOf<Uri>()
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_ADDED
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
         )
 
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
+        // Filter: Only files from Camera folder
+        val selection = "${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN (?, ?, ?)"
+        val selectionArgs = arrayOf("Camera", "カメラ", "Screenshots")
+
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             sortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
@@ -150,26 +211,28 @@ class PhotoRepository(private val context: Context) {
      * Get recently added photos (last 24 hours)
      */
     suspend fun getRecentPhotos(hoursAgo: Int = 24): List<Uri> = withContext(Dispatchers.IO) {
-        val photos = mutableListOf<Uri>()
+        val mediaFiles = mutableListOf<Uri>()
         val currentTime = System.currentTimeMillis() / 1000
         val timeThreshold = currentTime - (hoursAgo * 60 * 60)
 
-        val projection = arrayOf(
+        // Get recent photos (Camera folder only)
+        val imageProjection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_ADDED
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
         )
 
-        val selection = "${MediaStore.Images.Media.DATE_ADDED} >= ?"
-        val selectionArgs = arrayOf(timeThreshold.toString())
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        val imageSelection = "${MediaStore.Images.Media.DATE_ADDED} >= ? AND ${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN (?, ?, ?)"
+        val imageSelectionArgs = arrayOf(timeThreshold.toString(), "Camera", "カメラ", "Screenshots")
+        val imageSortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            sortOrder
+            imageProjection,
+            imageSelection,
+            imageSelectionArgs,
+            imageSortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             while (cursor.moveToNext()) {
@@ -178,39 +241,76 @@ class PhotoRepository(private val context: Context) {
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     id.toString()
                 )
-                photos.add(uri)
+                mediaFiles.add(uri)
             }
         }
 
-        Log.d(TAG, "Found ${photos.size} recent photos (last $hoursAgo hours)")
-        photos
+        Log.d(TAG, "Found ${mediaFiles.size} recent photos (last $hoursAgo hours)")
+
+        // Get recent videos (Camera folder only)
+        val videoProjection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.DATE_ADDED,
+            MediaStore.Video.Media.BUCKET_DISPLAY_NAME
+        )
+
+        val videoSelection = "${MediaStore.Video.Media.DATE_ADDED} >= ? AND ${MediaStore.Video.Media.BUCKET_DISPLAY_NAME} IN (?, ?)"
+        val videoSelectionArgs = arrayOf(timeThreshold.toString(), "Camera", "カメラ")
+        val videoSortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
+
+        context.contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            videoProjection,
+            videoSelection,
+            videoSelectionArgs,
+            videoSortOrder
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val uri = Uri.withAppendedPath(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    id.toString()
+                )
+                mediaFiles.add(uri)
+            }
+        }
+
+        Log.d(TAG, "Found total ${mediaFiles.size} recent media files (photos + videos, last $hoursAgo hours)")
+        mediaFiles
     }
 
     /**
-     * Upload photos to Storj backend API
+     * Upload photos and videos to Storj backend API
      */
     suspend fun uploadPhotos(
         photoUris: List<Uri>
     ): Result<UploadResponse> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "=== Starting upload process ===")
-            Log.d(TAG, "Photo URIs to upload: ${photoUris.size}")
+            Log.d(TAG, "Media URIs to upload: ${photoUris.size}")
 
             val parts = mutableListOf<MultipartBody.Part>()
 
             // Convert URIs to MultipartBody.Part
             for ((index, uri) in photoUris.withIndex()) {
-                Log.d(TAG, "Processing photo ${index + 1}/${photoUris.size}: $uri")
+                Log.d(TAG, "Processing media ${index + 1}/${photoUris.size}: $uri")
                 val file = uriToFile(uri)
                 if (file != null && file.exists()) {
-                    val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
+                    // Determine media type based on file extension
+                    val mimeType = when (file.extension.lowercase()) {
+                        "mp4", "mov", "avi", "mkv", "webm", "3gp" -> "video/*"
+                        else -> "image/*"
+                    }
+                    val requestBody = file.asRequestBody(mimeType.toMediaTypeOrNull())
                     val part = MultipartBody.Part.createFormData(
                         "files",
                         file.name,
                         requestBody
                     )
                     parts.add(part)
-                    Log.d(TAG, "✓ Added file: ${file.name} (${file.length()} bytes)")
+                    Log.d(TAG, "✓ Added file: ${file.name} (${file.length()} bytes, type: $mimeType)")
                 } else {
                     Log.w(TAG, "✗ Failed to convert URI to file: $uri")
                 }
@@ -279,7 +379,7 @@ class PhotoRepository(private val context: Context) {
     private fun uriToFile(uri: Uri): File? {
         return try {
             val contentResolver: ContentResolver = context.contentResolver
-            val displayName = getFileName(uri) ?: "photo_${System.currentTimeMillis()}.jpg"
+            val displayName = getFileName(uri) ?: "media_${System.currentTimeMillis()}"
             val file = File(context.cacheDir, displayName)
 
             contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -296,14 +396,24 @@ class PhotoRepository(private val context: Context) {
     }
 
     /**
-     * Get file name from URI
+     * Get file name from URI (works for both images and videos)
      */
     private fun getFileName(uri: Uri): String? {
         var fileName: String? = null
         context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
+            // Try to get DISPLAY_NAME from any column (works for both images and videos)
+            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
             if (nameIndex != -1 && cursor.moveToFirst()) {
                 fileName = cursor.getString(nameIndex)
+            } else {
+                // Fallback: try MediaStore columns
+                val imageNameIndex = cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
+                val videoNameIndex = cursor.getColumnIndex(MediaStore.Video.Media.DISPLAY_NAME)
+                if (imageNameIndex != -1 && cursor.moveToFirst()) {
+                    fileName = cursor.getString(imageNameIndex)
+                } else if (videoNameIndex != -1 && cursor.moveToFirst()) {
+                    fileName = cursor.getString(videoNameIndex)
+                }
             }
         }
         return fileName

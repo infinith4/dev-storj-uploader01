@@ -10,5 +10,7 @@ data class PhotoItem(
     val thumbnailPath: String? = null,
     val storjUrl: String? = null,
     val storjPath: String? = null,
-    val isFromStorj: Boolean = false
+    val isFromStorj: Boolean = false,
+    val isVideo: Boolean = false,
+    val size: Long = 0L
 )

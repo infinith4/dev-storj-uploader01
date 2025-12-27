@@ -21,7 +21,11 @@
         "esbenp.prettier-vscode",
         "bradlc.vscode-tailwindcss",
         "ms-vscode.vscode-typescript-next",
-        "Anthropic.claude-code"
+        "Anthropic.claude-code",
+        "openai.chatgpt",
+        "ms-azuretools.vscode-bicep",
+        "ms-vscode.azurecli",
+        "GitHub.vscode-github-actions"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",

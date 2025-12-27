@@ -1,0 +1,41 @@
+using './main.bicep'
+
+param baseName = 'storj-uploader'
+param location = 'japaneast'
+
+// Container images - 初回デプロイ用に public の Hello World を指定
+// ACR に push 後は '<your-acr-name>.azurecr.io/...' に置き換えてください
+param backendContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
+param frontendContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
+param storjContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
+
+// ACR 認証情報 (初回デプロイは空でOK)
+param containerRegistryServer = ''
+param containerRegistryUsername = ''
+@secure()
+param containerRegistryPassword = ''
+
+// ACR を Bicep で作成する場合は true
+param deployAcr = false
+param acrSku = 'Basic'
+param acrAdminUserEnabled = true
+
+// Managed Identity を使う場合は true にし、上記レジストリ資格情報は空でOK
+param enableManagedIdentity = false
+
+// Storj設定
+param storjBucketName = 'your-storj-bucket-name'
+param storjRemoteName = 'storj'
+
+// rclone.conf の内容をここに貼り付けてください
+// 本番環境では Azure Key Vault の使用を推奨します
+param rcloneConfig = '''
+[storj]
+type = storj
+access_grant = your-storj-access-grant-here
+'''
+
+// オプション設定
+param maxFileSize = 100000000  // 100MB
+param hashLength = 10
+param maxWorkers = 8

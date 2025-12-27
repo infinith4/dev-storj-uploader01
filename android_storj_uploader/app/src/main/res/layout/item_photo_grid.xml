@@ -25,4 +25,15 @@
         android:visibility="gone"
         android:background="@android:color/holo_green_dark" />
 
+    <!-- Video play icon -->
+    <ImageView
+        android:id="@+id/videoPlayIcon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:src="@android:drawable/ic_media_play"
+        android:contentDescription="Video play icon"
+        android:visibility="gone"
+        android:alpha="0.8" />
+
 </FrameLayout>

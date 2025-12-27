@@ -19,6 +19,7 @@ from PIL import Image
 import io
 from dotenv import load_dotenv
 from storj_client import StorjClient
+from video_processor import VideoProcessor
 from models import (
     UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse,
     ErrorResponse, FileUploadResult, FileInfo, FileStatus,
@@ -178,6 +179,30 @@ async def save_file_to_target(file_path: Path, target_path: Path):
     try:
         shutil.move(str(file_path), str(target_path))
         print(f"File moved to target directory: {target_path}")
+
+        # 動画ファイルの場合、サムネイルを生成
+        if VideoProcessor.is_video_file(target_path.name):
+            print(f"Generating thumbnail for video: {target_path.name}")
+            try:
+                # サムネイルのファイル名を生成 (basename_thumb.jpg)
+                video_stem = target_path.stem  # 拡張子なしのファイル名
+                thumbnail_filename = f"{video_stem}_thumb.jpg"
+                thumbnail_path = target_path.parent / thumbnail_filename
+
+                # サムネイル生成
+                success = VideoProcessor.generate_thumbnail(
+                    str(target_path),
+                    str(thumbnail_path),
+                    width=320,
+                    height=240
+                )
+
+                if success:
+                    print(f"✓ Thumbnail generated: {thumbnail_path.name}")
+                else:
+                    print(f"✗ Failed to generate thumbnail for: {target_path.name}")
+            except Exception as thumb_error:
+                print(f"Error generating thumbnail: {thumb_error}")
 
         # ファイル数が5個以上になったら自動的にアップロードを実行
         file_count = storj_client.count_files_in_target()
