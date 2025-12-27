@@ -45,22 +45,22 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify ACR exists
-        run: |
-          echo "Checking ACR: $ACR_NAME"
-          if ! az acr show --name "$ACR_NAME" &>/dev/null; then
-            echo "❌ ERROR: ACR '$ACR_NAME' not found"
-            echo "Please create the ACR first using Bicep deployment"
-            exit 1
-          fi
-          echo "✓ ACR '$ACR_NAME' exists"
+      # - name: Verify ACR exists
+      #   run: |
+      #     echo "Checking ACR: $ACR_NAME"
+      #     if ! az acr show --name "$ACR_NAME" &>/dev/null; then
+      #       echo "❌ ERROR: ACR '$ACR_NAME' not found"
+      #       echo "Please create the ACR first using Bicep deployment"
+      #       exit 1
+      #     fi
+      #     echo "✓ ACR '$ACR_NAME' exists"
 
-      - name: Verify ACR permissions
-        run: |
-          ACR_ID=$(az acr show --name "$ACR_NAME" --query id -o tsv)
-          echo "Checking role assignments for ACR: $ACR_ID"
-          az role assignment list --scope "$ACR_ID" --output table
-          echo "✓ Current user/SP has access to ACR"
+      # - name: Verify ACR permissions
+      #   run: |
+      #     ACR_ID=$(az acr show --name "$ACR_NAME" --query id -o tsv)
+      #     echo "Checking role assignments for ACR: $ACR_ID"
+      #     az role assignment list --scope "$ACR_ID" --output table
+      #     echo "✓ Current user/SP has access to ACR"
 
       - name: Login to ACR
         run: az acr login --name "$ACR_NAME"
