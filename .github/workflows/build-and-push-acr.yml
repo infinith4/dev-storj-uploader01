@@ -18,6 +18,7 @@ permissions:
 env:
   ACR_NAME: ${{ secrets.ACR_NAME }}
   ACR_LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+  RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
 
 jobs:
   build-and-push:
@@ -29,10 +30,15 @@ jobs:
         include:
           - name: storj-backend
             context: ./storj_uploader_backend_api_container_app
+            container_app: backend
           - name: storj-frontend
             context: ./storj_uploader_frontend_container_app
+            container_app: frontend
           - name: storj-uploader
             context: ./storj_container_app
+            container_app: storj
+    outputs:
+      acr_login_server: ${{ steps.set-outputs.outputs.acr_login_server }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,3 +78,54 @@ jobs:
             --tag "$ACR_LOGIN_SERVER/${{ matrix.name }}:latest" \
             --push \
             "${{ matrix.context }}"
+
+      - name: Set outputs
+        id: set-outputs
+        run: echo "acr_login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+
+  update-container-apps:
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    environment: dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: storj-backend
+            container_app_suffix: backend
+          - name: storj-frontend
+            container_app_suffix: frontend
+          - name: storj-uploader
+            container_app_suffix: storj
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App with new image
+        run: |
+          # Container App名を取得（接尾辞で検索）
+          CONTAINER_APP_NAME=$(az containerapp list \
+            --resource-group $RESOURCE_GROUP \
+            --query "[?contains(name, '${{ matrix.container_app_suffix }}')].name" \
+            -o tsv | head -n 1)
+
+          if [ -z "$CONTAINER_APP_NAME" ]; then
+            echo "❌ Container App not found for suffix: ${{ matrix.container_app_suffix }}"
+            exit 1
+          fi
+
+          echo "✓ Found Container App: $CONTAINER_APP_NAME"
+          echo "Updating with image: $ACR_LOGIN_SERVER/${{ matrix.name }}:latest"
+
+          # Container Appのイメージを更新
+          az containerapp update \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group $RESOURCE_GROUP \
+            --image "$ACR_LOGIN_SERVER/${{ matrix.name }}:latest" \
+            --output table
+
+          echo "✓ Container App updated successfully"
