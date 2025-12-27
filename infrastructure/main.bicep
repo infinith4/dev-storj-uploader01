@@ -34,6 +34,9 @@ param acrSku string = 'Basic'
 @description('Enable admin user for ACR (required for username/password auth)')
 param acrAdminUserEnabled bool = true
 
+@description('Principal ID (objectId) to grant AcrPush on the ACR. Leave empty to skip.')
+param acrPushPrincipalId string = ''
+
 @description('Enable system-assigned managed identity for Container Apps')
 param enableManagedIdentity bool = false
 
@@ -93,6 +96,7 @@ module acr 'modules/acr.bicep' = if (deployAcr) {
     location: location
     sku: acrSku
     adminUserEnabled: acrAdminUserEnabled
+    acrPushPrincipalId: acrPushPrincipalId
   }
 }
 
