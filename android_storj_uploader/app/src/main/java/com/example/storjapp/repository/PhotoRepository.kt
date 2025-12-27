@@ -39,6 +39,7 @@ class PhotoRepository(private val context: Context) {
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.SIZE,
             MediaStore.Images.Media.BUCKET_DISPLAY_NAME
         )
 
@@ -58,18 +59,20 @@ class PhotoRepository(private val context: Context) {
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn)
                 val dateAdded = cursor.getLong(dateColumn)
+                val size = cursor.getLong(sizeColumn)
                 val uri = Uri.withAppendedPath(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     id.toString()
                 )
 
                 val isUploaded = uploadedPhotos.contains(uri.toString())
-                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = false))
+                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = false, size = size))
                 localFileNames.add(name)
             }
         }
@@ -81,6 +84,7 @@ class PhotoRepository(private val context: Context) {
             MediaStore.Video.Media._ID,
             MediaStore.Video.Media.DISPLAY_NAME,
             MediaStore.Video.Media.DATE_ADDED,
+            MediaStore.Video.Media.SIZE,
             MediaStore.Video.Media.BUCKET_DISPLAY_NAME
         )
 
@@ -100,18 +104,20 @@ class PhotoRepository(private val context: Context) {
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
             val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn)
                 val dateAdded = cursor.getLong(dateColumn)
+                val size = cursor.getLong(sizeColumn)
                 val uri = Uri.withAppendedPath(
                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                     id.toString()
                 )
 
                 val isUploaded = uploadedPhotos.contains(uri.toString())
-                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = true))
+                photos.add(PhotoItem(uri, name, dateAdded, isUploaded, isVideo = true, size = size))
                 localFileNames.add(name)
             }
         }
@@ -141,7 +147,8 @@ class PhotoRepository(private val context: Context) {
                                 storjUrl = thumbnailUrl,
                                 storjPath = storjImage.path,
                                 isFromStorj = true,
-                                isVideo = storjImage.isVideo
+                                isVideo = storjImage.isVideo,
+                                size = storjImage.size
                             )
                         )
                         val mediaType = if (storjImage.isVideo) "video" else "photo"

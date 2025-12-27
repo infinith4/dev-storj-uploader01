@@ -2,7 +2,7 @@ services:
   storj-uploader-api:
     build: .
     ports:
-      - "8010:8010"
+      - "0.0.0.0:8010:8010"
     environment:
       - UPLOAD_TARGET_DIR=../storj_container_app/upload_target
       - TEMP_DIR=./temp

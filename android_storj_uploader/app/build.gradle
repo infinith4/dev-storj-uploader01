@@ -20,6 +20,18 @@ android {
         // Add Git commit hash to BuildConfig
         def gitCommitHash = 'git rev-parse --short HEAD'.execute().text.trim()
         buildConfigField "String", "GIT_COMMIT_HASH", "\"${gitCommitHash}\""
+
+        // API Base URL configuration
+        // Default: Emulator (10.0.2.2)
+        // For real device: Add "api.base.url=http://YOUR_PC_IP:8010/" to local.properties
+        def localProperties = new Properties()
+        def localPropertiesFile = rootProject.file('local.properties')
+        if (localPropertiesFile.exists()) {
+            localProperties.load(new FileInputStream(localPropertiesFile))
+        }
+
+        def apiBaseUrl = localProperties.getProperty('api.base.url', 'http://10.0.2.2:8010/')
+        buildConfigField "String", "API_BASE_URL", "\"${apiBaseUrl}\""
     }
 
     signingConfigs {

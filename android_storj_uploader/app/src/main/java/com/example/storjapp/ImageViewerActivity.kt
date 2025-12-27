@@ -28,7 +28,8 @@ class ImageViewerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ImageViewerActivity"
-        const val EXTRA_IMAGE_PATH = "image_path"
+        const val EXTRA_IMAGE_PATH = "image_path"  // For Storj images (HTTP URL path)
+        const val EXTRA_IMAGE_URI = "image_uri"    // For local images (Content URI)
         const val EXTRA_IMAGE_FILENAME = "image_filename"
         const val EXTRA_IMAGE_SIZE = "image_size"
         const val EXTRA_IMAGE_DATE = "image_date"
@@ -42,7 +43,8 @@ class ImageViewerActivity : AppCompatActivity() {
     private lateinit var downloadButton: Button
     private lateinit var closeButton: Button
 
-    private var imagePath: String? = null
+    private var imagePath: String? = null  // Storj path
+    private var imageUri: Uri? = null      // Local URI
     private var filename: String? = null
     private var fileSize: Long = 0
     private var modifiedDate: String? = null
@@ -77,6 +79,8 @@ class ImageViewerActivity : AppCompatActivity() {
 
         // Get image details from intent
         imagePath = intent.getStringExtra(EXTRA_IMAGE_PATH)
+        val uriString = intent.getStringExtra(EXTRA_IMAGE_URI)
+        imageUri = if (uriString != null) Uri.parse(uriString) else null
         filename = intent.getStringExtra(EXTRA_IMAGE_FILENAME)
         fileSize = intent.getLongExtra(EXTRA_IMAGE_SIZE, 0)
         modifiedDate = intent.getStringExtra(EXTRA_IMAGE_DATE)
@@ -86,8 +90,13 @@ class ImageViewerActivity : AppCompatActivity() {
         imageInfo.text = formatImageInfo()
 
         // Setup buttons
-        downloadButton.setOnClickListener {
-            checkPermissionAndDownload()
+        // Hide download button for local images (already on device)
+        if (imageUri != null) {
+            downloadButton.visibility = View.GONE
+        } else {
+            downloadButton.setOnClickListener {
+                checkPermissionAndDownload()
+            }
         }
 
         closeButton.setOnClickListener {
@@ -104,27 +113,30 @@ class ImageViewerActivity : AppCompatActivity() {
     }
 
     private fun loadImage() {
-        if (imagePath == null) {
-            showError("画像パスが指定されていません")
-            return
+        // Determine image source: local URI or Storj URL
+        val imageSource: Any = when {
+            imageUri != null -> {
+                Log.d(TAG, "Loading local image from URI: $imageUri")
+                imageUri!!
+            }
+            imagePath != null -> {
+                val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
+                val imageUrl = "$baseUrl/storj/images/$imagePath?thumbnail=false"
+                Log.d(TAG, "Loading Storj image from URL: $imageUrl")
+                imageUrl
+            }
+            else -> {
+                showError("画像パスが指定されていません")
+                return
+            }
         }
 
         loadingProgress.visibility = View.VISIBLE
         errorText.visibility = View.GONE
         photoView.visibility = View.INVISIBLE
 
-        // Construct full-size image URL (thumbnail=false)
-        val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')  // Remove trailing slash
-        val imageUrl = "$baseUrl/storj/images/$imagePath?thumbnail=false"
-
-        Log.d(TAG, "=== Image Load Details ===")
-        Log.d(TAG, "imagePath: $imagePath")
-        Log.d(TAG, "baseUrl (trimmed): $baseUrl")
-        Log.d(TAG, "Full imageUrl: $imageUrl")
-        Log.d(TAG, "=========================")
-
         Glide.with(this)
-            .load(imageUrl)
+            .load(imageSource)
             .listener(object : RequestListener<android.graphics.drawable.Drawable> {
                 override fun onLoadFailed(
                     e: GlideException?,

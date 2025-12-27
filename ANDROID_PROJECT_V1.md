@@ -16,3 +16,7 @@
 - [x] 画面詳細設計書を書きたい
 - [x] アプリのフッター部分をスマホの下部の位置から5%上に移動したい(すべての画面で適用したい)
 - [x] アプリのヘッダー部分をスマホの上部の位置から5%下に移動したい(すべての画面で適用したい)
+- [ ] storj_uploader_frontend_container_app, storj_uploader_backend_api_container_app, storj_container_app をBicep でデプロイできるようにして。storj_container_app
+- [ ] 実機Xaomi (2409BRN2CL）では画像をタップしても反応しない
+- [ ] アップロード一覧画面の下部にはGridではなくリストで最新のアップロードファイルを上から過去（下）に向かって一覧を表示してください。その際に、アップロード日時、ファイルサイズMB、撮影日時を記載して。
+- [ ] 実機Xaomi (2409BRN2CL）ではAPI へ接続できない

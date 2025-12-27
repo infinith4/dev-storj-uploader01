@@ -120,11 +120,11 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
                         val intent = Intent(context, ImageViewerActivity::class.java).apply {
                             putExtra(ImageViewerActivity.EXTRA_IMAGE_PATH, item.storjPath)
                             putExtra(ImageViewerActivity.EXTRA_IMAGE_FILENAME, item.fileName)
-                            putExtra(ImageViewerActivity.EXTRA_IMAGE_SIZE, 0L) // Size not available in PhotoItem
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_SIZE, item.size)
                             putExtra(ImageViewerActivity.EXTRA_IMAGE_DATE, "") // Date not available in PhotoItem
                         }
                         context.startActivity(intent)
-                        Log.d(TAG, "Successfully opened ImageViewerActivity for: ${item.fileName}")
+                        Log.d(TAG, "Successfully opened ImageViewerActivity for: ${item.fileName} (size: ${item.size} bytes)")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error opening viewer activity", e)
@@ -156,8 +156,16 @@ class PhotoGridAdapter : RecyclerView.Adapter<PhotoGridAdapter.ViewHolder>() {
                         context.startActivity(intent)
                         Log.d(TAG, "Successfully opened VideoPlayerActivity for local video: ${item.fileName}")
                     } else {
-                        // Local photo clicked - no viewer yet
-                        Log.d(TAG, "Local photo clicked (no viewer for local photos yet)")
+                        // Open local photo with ImageViewerActivity
+                        Log.d(TAG, "Local photo clicked: ${item.fileName}")
+                        val intent = Intent(context, ImageViewerActivity::class.java).apply {
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_URI, item.uri.toString())
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_FILENAME, item.fileName)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_SIZE, item.size)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_DATE, "")
+                        }
+                        context.startActivity(intent)
+                        Log.d(TAG, "Successfully opened ImageViewerActivity for local photo: ${item.fileName}")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error opening local media viewer", e)
