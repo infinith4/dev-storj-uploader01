@@ -251,8 +251,9 @@ module frontend 'modules/frontend.bicep' = {
 }
 
 // Grant Contributor role to Service Principal for Container Apps management
+// Note: ロール割り当てが既に存在する場合はスキップされます
 resource contributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(contributorPrincipalId)) {
-  name: guid(resourceGroup().id, contributorPrincipalId, 'Contributor')
+  name: guid(resourceGroup().id, contributorPrincipalId, 'Contributor', subscription().subscriptionId)
   scope: resourceGroup()
   properties: {
     principalId: contributorPrincipalId

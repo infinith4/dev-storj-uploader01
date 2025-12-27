@@ -404,20 +404,103 @@ az keyvault secret set \
 - 必要に応じて Virtual Network 統合を検討
 - カスタムドメインと SSL 証明書の設定
 
+## GitHub Actions CI/CD
+
+### GitHub Actions で必要な権限
+
+GitHub Actions からデプロイを自動化するには、Service Principal に以下の権限が必要です：
+
+#### 1. ACR への権限
+
+```bash
+# 環境変数の設定
+ACR_NAME=stjup2acrudm3tutq7eb7i
+SERVICE_PRINCIPAL_OBJECT_ID=778af043-9537-4f85-8c51-f93d502fda80
+
+# ACR ID の取得
+ACR_ID=$(az acr show --name $ACR_NAME --query id -o tsv)
+
+# AcrPush ロールを付与（イメージの push に必要）
+az role assignment create \
+  --assignee $SERVICE_PRINCIPAL_OBJECT_ID \
+  --role AcrPush \
+  --scope $ACR_ID
+
+# 権限の確認
+az role assignment list \
+  --assignee $SERVICE_PRINCIPAL_OBJECT_ID \
+  --scope $ACR_ID \
+  --query "[].{role:roleDefinitionName,scope:scope}" -o table
+```
+
+#### 2. Container Apps への権限
+
+```bash
+# 環境変数の設定
+RESOURCE_GROUP=rg-dev-storjup
+SERVICE_PRINCIPAL_OBJECT_ID=778af043-9537-4f85-8c51-f93d502fda80
+
+# リソースグループ ID の取得
+RG_ID=$(az group show --name $RESOURCE_GROUP --query id -o tsv)
+
+# Contributor ロールを付与（Container Apps の更新に必要）
+az role assignment create \
+  --assignee $SERVICE_PRINCIPAL_OBJECT_ID \
+  --role Contributor \
+  --scope $RG_ID
+
+# 権限の確認
+az role assignment list \
+  --assignee $SERVICE_PRINCIPAL_OBJECT_ID \
+  --scope $RG_ID \
+  --query "[].{role:roleDefinitionName,scope:scope}" -o table
+```
+
+#### 3. Bicep による自動権限付与（推奨）
+
+Bicep デプロイ時に自動的に権限を付与することもできます。[main.bicepparam](main.bicepparam) で以下のパラメータを設定してください：
+
+```bicep
+// GitHub Actions の Service Principal Object ID
+param acrPushPrincipalId = '778af043-9537-4f85-8c51-f93d502fda80'
+param contributorPrincipalId = '778af043-9537-4f85-8c51-f93d502fda80'
+```
+
+これらのパラメータが設定されていれば、Bicep デプロイ時に以下のロールが自動的に付与されます：
+- **ACR**: AcrPush ロール（イメージの push 権限）
+- **Resource Group**: Contributor ロール（Container Apps の読み取り・更新権限）
+
+### GitHub Secrets の設定
+
+GitHub リポジトリに以下の Secrets を設定してください：
+
+1. **認証情報（必須）**
+   - `AZURE_CLIENT_ID`: Service Principal の Application (Client) ID
+   - `AZURE_TENANT_ID`: Azure AD テナント ID
+   - `AZURE_SUBSCRIPTION_ID`: Azure サブスクリプション ID
+
+2. **環境変数（Variables として設定）**
+   - `ACR_NAME`: `stjup2acrudm3tutq7eb7i`
+   - `RESOURCE_GROUP`: `rg-dev-storjup`
+
+### ワークフローの動作
+
+`.github/workflows/build-and-push-acr.yml` ワークフローは以下を自動実行します：
+
+1. **build-and-push ジョブ**
+   - Docker イメージのビルド
+   - ACR へのイメージ push（並列実行）
+
+2. **update-container-apps ジョブ**
+   - Container Apps のイメージ更新
+   - 自動再起動とデプロイ（並列実行）
+
+main ブランチへの push で自動的に実行されます。
+
 ## 参考資料
 
 - [Azure Container Apps ドキュメント](https://learn.microsoft.com/ja-jp/azure/container-apps/)
 - [Bicep ドキュメント](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/bicep/)
 - [Azure Files ドキュメント](https://learn.microsoft.com/ja-jp/azure/storage/files/)
 - [rclone ドキュメント](https://rclone.org/docs/)
-
-ACR_NAME=stjup2studm3tutq7eb7i
-SUB_ID=330f0d87-755f-4802-abd6-acf0e6082672
-APP_OBJECT_ID=778af043-9537-4f85-8c51-f93d502fda80
-
-ACR_ID=$(az acr show --name $ACR_NAME --subscription $SUB_ID --query id -o tsv)
-
-az role assignment list \
- --assignee $APP_OBJECT_ID \
- --scope $ACR_ID \
- --query "[].{role:roleDefinitionName,scope:scope}" -o table
+- [GitHub Actions と Azure の連携](https://learn.microsoft.com/ja-jp/azure/developer/github/connect-from-azure)
