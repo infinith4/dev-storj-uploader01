@@ -37,6 +37,9 @@ param acrAdminUserEnabled bool = true
 @description('Principal ID (objectId) to grant AcrPush on the ACR. Leave empty to skip.')
 param acrPushPrincipalId string = ''
 
+@description('Principal ID (objectId) to grant Contributor role on the resource group for Container Apps management. Leave empty to skip.')
+param contributorPrincipalId string = ''
+
 @description('Enable system-assigned managed identity for Container Apps')
 param enableManagedIdentity bool = false
 
@@ -244,6 +247,17 @@ module frontend 'modules/frontend.bicep' = {
     containerRegistryUsername: resolvedRegistryUsername
     containerRegistryPassword: resolvedRegistryPassword
     backendApiUrl: 'https://${backendApi.outputs.fqdn}'
+  }
+}
+
+// Grant Contributor role to Service Principal for Container Apps management
+resource contributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(contributorPrincipalId)) {
+  name: guid(resourceGroup().id, contributorPrincipalId, 'Contributor')
+  scope: resourceGroup()
+  properties: {
+    principalId: contributorPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
+    principalType: 'ServicePrincipal'
   }
 }
 
