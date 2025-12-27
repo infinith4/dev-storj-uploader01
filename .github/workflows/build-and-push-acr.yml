@@ -16,9 +16,9 @@ permissions:
   contents: read
 
 env:
-  ACR_NAME: ${{ secrets.ACR_NAME }}
-  ACR_LOGIN_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
-  RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
 
 jobs:
   build-and-push:
