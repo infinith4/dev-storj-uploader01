@@ -33,6 +33,7 @@
 ## デプロイされるリソース
 
 ### インフラストラクチャ
+
 - **Log Analytics Workspace** - コンテナログの収集と分析
 - **Container Apps Environment** - コンテナアプリの実行環境
 - **Storage Account** - Azure Files による永続化ストレージ
@@ -42,19 +43,22 @@
   - `thumbnail-cache` - サムネイルキャッシュ
 
 ### アプリケーション
-- **Backend API Container App** (最小SKU: 0.25 vCPU, 0.5Gi メモリ)
+
+- **Backend API Container App** (最小 SKU: 0.25 vCPU, 0.5Gi メモリ)
+
   - FastAPI ベースの REST API
   - ポート: 8010
   - 外部アクセス: 有効 (HTTPS)
   - スケール: 1 レプリカ固定
 
-- **Frontend Container App** (最小SKU: 0.25 vCPU, 0.5Gi メモリ)
+- **Frontend Container App** (最小 SKU: 0.25 vCPU, 0.5Gi メモリ)
+
   - React + TypeScript フロントエンド
   - ポート: 9010
   - 外部アクセス: 有効 (HTTPS)
   - スケール: 1 レプリカ固定
 
-- **Storj Uploader Container App** (最小SKU: 0.25 vCPU, 0.5Gi メモリ)
+- **Storj Uploader Container App** (最小 SKU: 0.25 vCPU, 0.5Gi メモリ)
   - Python + rclone アップローダー
   - 外部アクセス: 無効
   - スケール: 1 レプリカ固定
@@ -62,12 +66,14 @@
 ## 前提条件
 
 ### 必要なツール
+
 - Azure CLI 2.50.0 以上
 - Bicep CLI (Azure CLI に含まれる)
 - Docker (コンテナイメージのビルド用)
 - Azure Container Registry (ACR) または Docker Hub
 
 ### Azure サブスクリプション
+
 - Azure サブスクリプションへのアクセス
 - リソースグループ作成権限
 - Container Apps のデプロイ権限
@@ -199,11 +205,12 @@ az deployment group show \
 
 ACR からイメージをプルする方法は 2 通りです：
 
-1. **パラメータに ACR 認証情報を設定する方法（簡単）**  
+1. **パラメータに ACR 認証情報を設定する方法（簡単）**
+
    - `containerRegistryServer`, `containerRegistryUsername`, `containerRegistryPassword` に ACR の管理ユーザーまたはサービスプリンシパルの資格情報を設定します。
    - 特別なロール付与は不要です。
 
-2. **Managed Identity + AcrPull ロールを使う方法（推奨）**  
+2. **Managed Identity + AcrPull ロールを使う方法（推奨）**
    - パラメータ `enableManagedIdentity = true` とし、`containerRegistry*` は空のままで構いません。
    - デプロイ後に Container Apps の SystemAssigned ID に ACR の `AcrPull` を付与します。
 
@@ -348,6 +355,7 @@ az containerapp env storage list \
 ### さらなるコスト削減
 
 1. **使用しない時間帯にスケールダウン**
+
    ```bash
    az containerapp update \
      --resource-group rg-dev-storjup \
@@ -357,6 +365,7 @@ az containerapp env storage list \
    ```
 
 2. **Log Analytics の保持期間を短縮**
+
    ```bash
    az monitor log-analytics workspace update \
      --resource-group rg-dev-storjup \
@@ -401,3 +410,14 @@ az keyvault secret set \
 - [Bicep ドキュメント](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/bicep/)
 - [Azure Files ドキュメント](https://learn.microsoft.com/ja-jp/azure/storage/files/)
 - [rclone ドキュメント](https://rclone.org/docs/)
+
+ACR_NAME=stjup2studm3tutq7eb7i
+SUB_ID=330f0d87-755f-4802-abd6-acf0e6082672
+APP_OBJECT_ID=778af043-9537-4f85-8c51-f93d502fda80
+
+ACR_ID=$(az acr show --name $ACR_NAME --subscription $SUB_ID --query id -o tsv)
+
+az role assignment list \
+ --assignee $APP_OBJECT_ID \
+ --scope $ACR_ID \
+ --query "[].{role:roleDefinitionName,scope:scope}" -o table
