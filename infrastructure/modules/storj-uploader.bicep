@@ -39,16 +39,22 @@ param hashLength int = 10
 @description('Max workers for parallel upload')
 param maxWorkers int = 8
 
-@description('rclone.conf content')
+@description('Key Vault URI for secrets')
+param keyVaultUri string = ''
+
+@description('Use Key Vault for rclone config')
+param useKeyVault bool = true
+
+@description('rclone.conf content (fallback if not using Key Vault)')
 @secure()
-param rcloneConfig string
+param rcloneConfig string = ''
 
 resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
-  identity: enableManagedIdentity ? {
+  identity: {
     type: 'SystemAssigned'
-  } : null
+  }
   properties: {
     environmentId: environmentId
     configuration: {
@@ -57,6 +63,13 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'storage-key'
           value: storageAccountKey
         }
+      ], useKeyVault && !empty(keyVaultUri) ? [
+        {
+          name: 'rclone-config'
+          keyVaultUrl: '${keyVaultUri}secrets/rclone-config'
+          identity: 'system'
+        }
+      ] : [
         {
           name: 'rclone-config'
           value: rcloneConfig
@@ -154,3 +167,4 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 output containerAppName string = storjUploader.name
+output principalId string = storjUploader.identity.principalId
