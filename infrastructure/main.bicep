@@ -71,6 +71,17 @@ var acrName = toLower(replace('${baseName}acr${uniqueSuffix}', '-', ''))
 var backendAppName = '${baseName}-backend-${uniqueSuffix}'
 var frontendAppName = '${baseName}-frontend-${uniqueSuffix}'
 var storjAppName = '${baseName}-storj-${uniqueSuffix}'
+var keyVaultName = '${baseName}-kv-${uniqueSuffix}'
+
+// Key Vault
+module keyVault 'modules/key-vault.bicep' = {
+  name: 'keyVault'
+  params: {
+    keyVaultName: keyVaultName
+    location: location
+    secretsUserPrincipalIds: []
+  }
+}
 
 // Log Analytics Workspace
 module logAnalytics 'modules/log-analytics.bicep' = {
@@ -226,11 +237,28 @@ module storjUploader 'modules/storj-uploader.bicep' = {
     storjRemoteName: storjRemoteName
     hashLength: hashLength
     maxWorkers: maxWorkers
+    keyVaultUri: keyVault.outputs.keyVaultUri
+    useKeyVault: true
     rcloneConfig: rcloneConfig
   }
   dependsOn: [
     storageConfig
     storageConfigUploaded
+    keyVault
+  ]
+}
+
+// Grant Key Vault Secrets User role to Storj Uploader Managed Identity
+resource storjKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.outputs.keyVaultId, storjUploader.outputs.containerAppName, 'KeyVaultSecretsUser')
+  scope: resourceGroup()
+  properties: {
+    principalId: storjUploader.outputs.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    principalType: 'ServicePrincipal'
+  }
+  dependsOn: [
+    storjUploader
   ]
 }
 
