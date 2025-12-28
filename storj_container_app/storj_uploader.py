@@ -13,6 +13,14 @@ import threading
 from PIL import Image
 import io
 
+# Blob Storage support
+try:
+    from azure.storage.blob import BlobServiceClient
+    BLOB_STORAGE_AVAILABLE = True
+except ImportError:
+    BLOB_STORAGE_AVAILABLE = False
+    print("Warning: azure-storage-blob not installed. Blob Storage functions will not be available.")
+
 class StorjUploader:
     def __init__(self):
         load_dotenv()
@@ -25,6 +33,30 @@ class StorjUploader:
         self.temp_dir = Path('temp_upload')
         self.lock = threading.Lock()
 
+        # Blob Storage configuration
+        self.blob_service_client = None
+        self.use_blob_storage = False
+        self.upload_container_name = os.getenv('AZURE_STORAGE_UPLOAD_CONTAINER', 'upload-target')
+        self.uploaded_container_name = os.getenv('AZURE_STORAGE_UPLOADED_CONTAINER', 'uploaded')
+
+        # Try to initialize Blob Storage
+        if BLOB_STORAGE_AVAILABLE:
+            account_name = os.getenv('AZURE_STORAGE_ACCOUNT_NAME')
+            account_key = os.getenv('AZURE_STORAGE_ACCOUNT_KEY')
+
+            if account_name and account_key:
+                try:
+                    self.blob_service_client = BlobServiceClient(
+                        account_url=f"https://{account_name}.blob.core.windows.net",
+                        credential=account_key
+                    )
+                    self.use_blob_storage = True
+                    print("✓ Blob Storage initialized successfully")
+                except Exception as e:
+                    print(f"⚠ Failed to initialize Blob Storage: {e}")
+                    print("  Files will be read from local filesystem instead")
+
+        # Create local directories (used as fallback or temp storage)
         self.uploaded_dir.mkdir(exist_ok=True)
         self.upload_target_dir.mkdir(exist_ok=True)
         self.temp_dir.mkdir(exist_ok=True)
@@ -374,18 +406,138 @@ class StorjUploader:
                 print(f"[{thread_id}] Exception uploading {file_path.name}: {e}")
             return False, file_path, f"exception: {e}"
 
+    def upload_single_file_from_blob(self, blob_name):
+        """Download blob, upload to Storj, then move to uploaded container"""
+        thread_id = threading.current_thread().name
+
+        try:
+            # Download blob to temporary directory
+            with self.lock:
+                print(f"[{thread_id}] Downloading blob: {blob_name}")
+
+            local_file_path = self.download_blob_to_temp(blob_name, thread_id)
+            if not local_file_path:
+                with self.lock:
+                    print(f"[{thread_id}] Failed to download blob: {blob_name}")
+                return False, blob_name, "download_failed"
+
+            # Upload to Storj using existing method
+            success, _, status = self.upload_single_file(local_file_path)
+
+            # Clean up temporary file
+            if local_file_path.exists():
+                local_file_path.unlink()
+
+            # Clean up thread directory if empty
+            thread_temp_dir = self.temp_dir / thread_id
+            try:
+                thread_temp_dir.rmdir()
+            except OSError:
+                pass
+
+            if success:
+                # Move blob to uploaded container
+                if self.move_blob_to_uploaded(blob_name):
+                    with self.lock:
+                        print(f"[{thread_id}] Moved blob {blob_name} to uploaded container")
+                else:
+                    with self.lock:
+                        print(f"[{thread_id}] Warning: Failed to move blob {blob_name} to uploaded container")
+
+            return success, blob_name, status
+
+        except Exception as e:
+            with self.lock:
+                print(f"[{thread_id}] Exception processing blob {blob_name}: {e}")
+            return False, blob_name, f"exception: {e}"
+
+    def list_blob_files(self):
+        """List all blob files in upload-target container"""
+        if not self.use_blob_storage:
+            return []
+
+        try:
+            container_client = self.blob_service_client.get_container_client(self.upload_container_name)
+            blob_names = [blob.name for blob in container_client.list_blobs()]
+            return blob_names
+        except Exception as e:
+            print(f"Error listing blob files: {e}")
+            return []
+
+    def download_blob_to_temp(self, blob_name, thread_id):
+        """Download a blob to temporary directory for processing"""
+        if not self.use_blob_storage:
+            return None
+
+        try:
+            # Create thread-specific temp directory
+            thread_temp_dir = self.temp_dir / thread_id
+            thread_temp_dir.mkdir(exist_ok=True)
+
+            # Download blob
+            local_path = thread_temp_dir / blob_name
+            blob_client = self.blob_service_client.get_blob_client(
+                container=self.upload_container_name,
+                blob=blob_name
+            )
+
+            with open(local_path, "wb") as download_file:
+                download_file.write(blob_client.download_blob().readall())
+
+            return local_path
+        except Exception as e:
+            print(f"Error downloading blob {blob_name}: {e}")
+            return None
+
+    def move_blob_to_uploaded(self, blob_name):
+        """Move blob from upload-target to uploaded container"""
+        if not self.use_blob_storage:
+            return False
+
+        try:
+            # Copy to uploaded container
+            source_blob = self.blob_service_client.get_blob_client(self.upload_container_name, blob_name)
+            dest_blob = self.blob_service_client.get_blob_client(self.uploaded_container_name, blob_name)
+
+            dest_blob.start_copy_from_url(source_blob.url)
+
+            # Delete from source
+            source_blob.delete_blob()
+
+            return True
+        except Exception as e:
+            print(f"Error moving blob {blob_name}: {e}")
+            return False
+
     def upload_files(self):
-        if not self.upload_target_dir.exists() or not any(self.upload_target_dir.iterdir()):
-            print("No files found in upload_target directory.")
-            return True
+        # Get files to upload from Blob Storage or local filesystem
+        if self.use_blob_storage:
+            blob_names = self.list_blob_files()
+            if not blob_names:
+                print("No files found in Blob Storage upload-target container.")
+                return True
 
-        # Get all files to upload (exclude temporary hash files)
-        files_to_upload = [f for f in self.upload_target_dir.iterdir()
-                          if f.is_file() and not self._is_temp_hash_file(f.name)]
+            # Filter out temporary hash files
+            files_to_upload = [name for name in blob_names if not self._is_temp_hash_file(name)]
 
-        if not files_to_upload:
-            print("No files found in upload_target directory.")
-            return True
+            if not files_to_upload:
+                print("No files found in Blob Storage upload-target container.")
+                return True
+
+            print(f"Found {len(files_to_upload)} files in Blob Storage to upload")
+        else:
+            # Local filesystem mode
+            if not self.upload_target_dir.exists() or not any(self.upload_target_dir.iterdir()):
+                print("No files found in upload_target directory.")
+                return True
+
+            # Get all files to upload (exclude temporary hash files)
+            files_to_upload = [f.name for f in self.upload_target_dir.iterdir()
+                              if f.is_file() and not self._is_temp_hash_file(f.name)]
+
+            if not files_to_upload:
+                print("No files found in upload_target directory.")
+                return True
 
         print(f"Starting upload of {len(files_to_upload)} files with {self.max_workers} workers...")
 
@@ -394,18 +546,25 @@ class StorjUploader:
 
         # Use ThreadPoolExecutor for parallel uploads
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all upload tasks
-            future_to_file = {executor.submit(self.upload_single_file, file_path): file_path
-                             for file_path in files_to_upload}
+            # Submit all upload tasks based on storage type
+            if self.use_blob_storage:
+                # Blob Storage mode: upload from blob names
+                future_to_file = {executor.submit(self.upload_single_file_from_blob, blob_name): blob_name
+                                 for blob_name in files_to_upload}
+            else:
+                # Local filesystem mode: upload from file paths
+                file_paths = [self.upload_target_dir / filename for filename in files_to_upload]
+                future_to_file = {executor.submit(self.upload_single_file, file_path): file_path
+                                 for file_path in file_paths}
 
             # Process completed uploads
             for future in as_completed(future_to_file):
-                success, file_path, status = future.result()
+                success, file_identifier, status = future.result()
 
                 if success and status == "uploaded":
                     uploaded_count += 1
                 elif not success:
-                    failed_uploads.append((file_path, status))
+                    failed_uploads.append((file_identifier, status))
 
         # Report results
         print(f"\nUpload completed:")
@@ -414,8 +573,13 @@ class StorjUploader:
 
         if failed_uploads:
             print("Failed files:")
-            for file_path, reason in failed_uploads:
-                print(f"  - {file_path.name}: {reason}")
+            for file_identifier, reason in failed_uploads:
+                # Handle both Path objects and string blob names
+                if isinstance(file_identifier, Path):
+                    filename = file_identifier.name
+                else:
+                    filename = file_identifier
+                print(f"  - {filename}: {reason}")
             return False
 
         return True
