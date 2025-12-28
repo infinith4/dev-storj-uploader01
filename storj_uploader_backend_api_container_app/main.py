@@ -26,6 +26,14 @@ from models import (
     StorjImageListResponse, StorjImageItem
 )
 
+try:
+    from blob_storage import BlobStorageHelper
+    BLOB_STORAGE_AVAILABLE = True
+except ImportError:
+    BlobStorageHelper = None
+    BLOB_STORAGE_AVAILABLE = False
+    print("Warning: azure-storage-blob not installed. Blob Storage functions will not be available.")
+
 # Load environment variables from storj_container_app/.env
 load_dotenv()  # Load from current directory first
 storj_env_path = Path(__file__).parent / "../storj_container_app/.env"
@@ -88,6 +96,16 @@ app = FastAPI(
 
 # Storjクライアント初期化
 storj_client = StorjClient()
+
+# Blob Storage初期化
+blob_helper = None
+if BLOB_STORAGE_AVAILABLE and BlobStorageHelper:
+    try:
+        blob_helper = BlobStorageHelper()
+        print("✓ Blob Storage initialized successfully in main.py")
+    except Exception as e:
+        print(f"⚠ Failed to initialize Blob Storage in main.py: {e}")
+        print("  Files will be stored locally instead")
 
 # CORS設定
 app.add_middleware(
@@ -177,30 +195,75 @@ class FileProcessor:
 async def save_file_to_target(file_path: Path, target_path: Path):
     """ファイルをターゲットディレクトリに移動し、必要に応じてアップロードをトリガー"""
     try:
-        shutil.move(str(file_path), str(target_path))
-        print(f"File moved to target directory: {target_path}")
+        # Blob Storageが利用可能な場合はBlobにアップロード、そうでなければローカルに移動
+        if blob_helper:
+            try:
+                # Blobにアップロード
+                blob_name = target_path.name
+                blob_helper.upload_file(str(file_path), blob_name)
+                print(f"✓ File uploaded to Blob Storage: {blob_name}")
+
+                # アップロード後、ローカルファイルを削除
+                if file_path.exists():
+                    file_path.unlink()
+
+            except Exception as blob_error:
+                print(f"⚠ Blob Storage upload failed: {blob_error}")
+                print(f"  Falling back to local filesystem")
+                # フォールバック: ローカルファイルシステムに移動
+                shutil.move(str(file_path), str(target_path))
+                print(f"File moved to target directory: {target_path}")
+        else:
+            # Blob Storageが利用不可の場合はローカルに移動
+            shutil.move(str(file_path), str(target_path))
+            print(f"File moved to target directory: {target_path}")
 
         # 動画ファイルの場合、サムネイルを生成
-        if VideoProcessor.is_video_file(target_path.name):
-            print(f"Generating thumbnail for video: {target_path.name}")
+        # Note: サムネイル生成はローカルファイルが必要なため、Blob Storageモードでは一時的にダウンロードが必要
+        video_filename = target_path.name
+        if VideoProcessor.is_video_file(video_filename):
+            print(f"Generating thumbnail for video: {video_filename}")
             try:
+                # Blob Storageからダウンロードしてサムネイル生成
+                if blob_helper and blob_helper.blob_exists(video_filename):
+                    # 一時ファイルにダウンロード
+                    temp_video_path = TEMP_DIR / video_filename
+                    blob_helper.download_file(video_filename, str(temp_video_path))
+                    video_file_path = temp_video_path
+                else:
+                    # ローカルファイルを使用
+                    video_file_path = target_path
+
                 # サムネイルのファイル名を生成 (basename_thumb.jpg)
-                video_stem = target_path.stem  # 拡張子なしのファイル名
+                video_stem = Path(video_filename).stem  # 拡張子なしのファイル名
                 thumbnail_filename = f"{video_stem}_thumb.jpg"
-                thumbnail_path = target_path.parent / thumbnail_filename
+                thumbnail_path = TEMP_DIR / thumbnail_filename
 
                 # サムネイル生成
                 success = VideoProcessor.generate_thumbnail(
-                    str(target_path),
+                    str(video_file_path),
                     str(thumbnail_path),
                     width=320,
                     height=240
                 )
 
                 if success:
-                    print(f"✓ Thumbnail generated: {thumbnail_path.name}")
+                    print(f"✓ Thumbnail generated: {thumbnail_filename}")
+                    # サムネイルもBlobにアップロード
+                    if blob_helper:
+                        try:
+                            blob_helper.upload_file(str(thumbnail_path), thumbnail_filename)
+                            print(f"✓ Thumbnail uploaded to Blob Storage: {thumbnail_filename}")
+                            thumbnail_path.unlink()  # アップロード後削除
+                        except Exception as thumb_upload_error:
+                            print(f"⚠ Failed to upload thumbnail to Blob: {thumb_upload_error}")
                 else:
-                    print(f"✗ Failed to generate thumbnail for: {target_path.name}")
+                    print(f"✗ Failed to generate thumbnail for: {video_filename}")
+
+                # 一時ダウンロードしたファイルを削除
+                if blob_helper and temp_video_path.exists():
+                    temp_video_path.unlink()
+
             except Exception as thumb_error:
                 print(f"Error generating thumbnail: {thumb_error}")
 

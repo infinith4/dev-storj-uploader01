@@ -23,6 +23,9 @@ param containerRegistryUsername string = ''
 @secure()
 param containerRegistryPassword string = ''
 
+@description('Storage Account Name')
+param storageAccountName string
+
 @description('Storage Account Key')
 @secure()
 param storageAccountKey string
@@ -130,6 +133,26 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'API_BASE_URL'
               value: apiBaseUrl
             }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_NAME'
+              value: storageAccountName
+            }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_KEY'
+              secretRef: 'storage-key'
+            }
+            {
+              name: 'AZURE_STORAGE_UPLOAD_CONTAINER'
+              value: 'upload-target'
+            }
+            {
+              name: 'AZURE_STORAGE_UPLOADED_CONTAINER'
+              value: 'uploaded'
+            }
+            {
+              name: 'CLOUD_ENV'
+              value: 'azure'
+            }
           ]
           volumeMounts: [
             {
@@ -139,14 +162,6 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
             {
               volumeName: 'thumbnail-cache'
               mountPath: '/app/thumbnail_cache'
-            }
-            {
-              volumeName: 'upload-target'
-              mountPath: '/mnt/upload-target'
-            }
-            {
-              volumeName: 'uploaded'
-              mountPath: '/mnt/uploaded'
             }
           ]
         }
@@ -165,16 +180,6 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'thumbnail-cache'
           storageType: 'AzureFile'
           storageName: 'thumbnail-cache'
-        }
-        {
-          name: 'upload-target'
-          storageType: 'AzureFile'
-          storageName: 'upload-target'
-        }
-        {
-          name: 'uploaded'
-          storageType: 'AzureFile'
-          storageName: 'uploaded'
         }
       ]
     }

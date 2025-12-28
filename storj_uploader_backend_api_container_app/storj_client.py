@@ -8,6 +8,14 @@ import time
 from datetime import datetime
 from collections import defaultdict
 
+try:
+    from blob_storage import BlobStorageHelper
+    BLOB_STORAGE_AVAILABLE = True
+except ImportError:
+    BlobStorageHelper = None
+    BLOB_STORAGE_AVAILABLE = False
+    print("Warning: azure-storage-blob not installed. Blob Storage功能will not be available.")
+
 class StorjClient:
     """Storj Container Appとの連携クライアント"""
 
@@ -37,6 +45,16 @@ class StorjClient:
         self.image_locks = defaultdict(threading.Lock)
         self.image_locks_lock = threading.Lock()
 
+        # Blob Storage helper (常に初期化を試行)
+        self.blob_helper = None
+        if BLOB_STORAGE_AVAILABLE and BlobStorageHelper:
+            try:
+                self.blob_helper = BlobStorageHelper()
+                print("✓ Blob Storage initialized successfully")
+            except Exception as e:
+                print(f"⚠ Failed to initialize Blob Storage: {e}")
+                print("  Files will be stored locally instead")
+
     def check_storj_app_available(self) -> bool:
         """Storj Container Appが利用可能かチェック"""
         exists = self.storj_script.exists()
@@ -60,11 +78,17 @@ class StorjClient:
     def count_files_in_target(self) -> int:
         """アップロード対象ディレクトリのファイル数を取得"""
         try:
+            # Cloud環境ではBlob Storageのファイル数を取得
+            if self.blob_helper:
+                return self.blob_helper.get_blob_count()
+
+            # Local環境ではファイルシステムを使用
             target_dir = self.get_upload_target_dir()
             if not target_dir.exists():
                 return 0
             return len([f for f in target_dir.iterdir() if f.is_file()])
-        except Exception:
+        except Exception as e:
+            print(f"Error counting files: {e}")
             return 0
 
     def run_storj_uploader(self) -> Tuple[bool, str]:
