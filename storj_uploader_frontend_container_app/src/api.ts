@@ -1,9 +1,21 @@
 import axios from 'axios';
 import { UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse, StorjImageListResponse } from './types';
 
+// TypeScript型定義
+declare global {
+  interface Window {
+    ENV?: {
+      REACT_APP_API_URL?: string;
+    };
+  }
+}
+
 // Container Apps環境では相対パスを使用（nginxプロキシ経由）
 // 開発環境では環境変数で指定されたURLを使用
-const API_BASE_URL = process.env.REACT_APP_API_URL || '';
+// window.ENVはビルド後にnginxから注入される
+const API_BASE_URL = window.ENV?.REACT_APP_API_URL || process.env.REACT_APP_API_URL || '';
+
+console.log('API_BASE_URL configured as:', API_BASE_URL || '(empty - using relative paths)');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
