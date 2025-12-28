@@ -211,7 +211,7 @@ module storjUploader 'modules/storj-uploader.bicep' = {
     hashLength: hashLength
     maxWorkers: maxWorkers
     keyVaultUri: keyVault.outputs.keyVaultUri
-    useKeyVault: false  // 初回デプロイ後、Key Vaultにシークレットを追加してからtrueに変更
+    useKeyVault: true  // Key Vaultからrclone.confを読み込む
     rcloneConfig: rcloneConfig
   }
   dependsOn: [
