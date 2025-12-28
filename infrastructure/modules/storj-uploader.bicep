@@ -10,9 +10,6 @@ param environmentId string
 @description('Container image')
 param containerImage string
 
-@description('Enable system-assigned managed identity')
-param enableManagedIdentity bool = false
-
 @description('Container registry server (e.g., myregistry.azurecr.io). Leave empty for public images')
 param containerRegistryServer string = ''
 
@@ -22,6 +19,9 @@ param containerRegistryUsername string = ''
 @description('Container registry password')
 @secure()
 param containerRegistryPassword string = ''
+
+@description('Storage Account Name')
+param storageAccountName string
 
 @description('Storage Account Key')
 @secure()
@@ -118,16 +118,28 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'RCLONE_CONFIG'
               secretRef: 'rclone-config'
             }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_NAME'
+              value: storageAccountName
+            }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_KEY'
+              secretRef: 'storage-key'
+            }
+            {
+              name: 'AZURE_STORAGE_UPLOAD_CONTAINER'
+              value: 'upload-target'
+            }
+            {
+              name: 'AZURE_STORAGE_UPLOADED_CONTAINER'
+              value: 'uploaded'
+            }
+            {
+              name: 'CLOUD_ENV'
+              value: 'azure'
+            }
           ]
           volumeMounts: [
-            {
-              volumeName: 'upload-target'
-              mountPath: '/app/upload_target'
-            }
-            {
-              volumeName: 'uploaded'
-              mountPath: '/app/uploaded'
-            }
             {
               volumeName: 'rclone-config-volume'
               mountPath: '/root/.config/rclone'
@@ -147,16 +159,6 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
         maxReplicas: 1
       }
       volumes: [
-        {
-          name: 'upload-target'
-          storageType: 'AzureFile'
-          storageName: 'upload-target'
-        }
-        {
-          name: 'uploaded'
-          storageType: 'AzureFile'
-          storageName: 'uploaded'
-        }
         {
           name: 'rclone-config-volume'
           storageType: 'EmptyDir'

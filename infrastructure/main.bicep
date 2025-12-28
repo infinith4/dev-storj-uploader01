@@ -118,51 +118,24 @@ var resolvedRegistryServer = deployAcr ? acr.outputs.loginServer : containerRegi
 var resolvedRegistryUsername = deployAcr ? acr.outputs.username : containerRegistryUsername
 var resolvedRegistryPassword = deployAcr ? acr.outputs.password : containerRegistryPassword
 
-// Storage Account with File Shares
+// Storage Account with Blob Containers and File Shares
 module storage 'modules/storage.bicep' = {
   name: 'storage'
   params: {
     storageAccountName: replace(storageAccountName, '-', '')
     location: location
     fileShares: [
-      'upload-target'
-      'uploaded'
       'temp'
       'thumbnail-cache'
+    ]
+    blobContainers: [
+      'upload-target'
+      'uploaded'
     ]
   }
 }
 
-// Storage configuration for Container Apps Environment
-resource storageConfig 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
-  name: '${environmentName}/upload-target'
-  properties: {
-    azureFile: {
-      accountName: storage.outputs.storageAccountName
-      accountKey: storage.outputs.storageAccountKey
-      shareName: 'upload-target'
-      accessMode: 'ReadWrite'
-    }
-  }
-  dependsOn: [
-    environment
-  ]
-}
-
-resource storageConfigUploaded 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
-  name: '${environmentName}/uploaded'
-  properties: {
-    azureFile: {
-      accountName: storage.outputs.storageAccountName
-      accountKey: storage.outputs.storageAccountKey
-      shareName: 'uploaded'
-      accessMode: 'ReadWrite'
-    }
-  }
-  dependsOn: [
-    environment
-  ]
-}
+// Storage configuration for Container Apps Environment (File Shares only)
 
 resource storageConfigTemp 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
   name: '${environmentName}/temp'
@@ -206,6 +179,7 @@ module backendApi 'modules/backend-api.bicep' = {
     containerRegistryServer: resolvedRegistryServer
     containerRegistryUsername: resolvedRegistryUsername
     containerRegistryPassword: resolvedRegistryPassword
+    storageAccountName: storage.outputs.storageAccountName
     storageAccountKey: storage.outputs.storageAccountKey
     storjBucketName: storjBucketName
     storjRemoteName: storjRemoteName
@@ -213,10 +187,9 @@ module backendApi 'modules/backend-api.bicep' = {
     apiBaseUrl: 'https://${backendAppName}.${environment.outputs.defaultDomain}'
   }
   dependsOn: [
-    storageConfig
-    storageConfigUploaded
     storageConfigTemp
     storageConfigThumbnail
+    storage
   ]
 }
 
@@ -228,29 +201,27 @@ module storjUploader 'modules/storj-uploader.bicep' = {
     location: location
     environmentId: environment.outputs.environmentId
     containerImage: storjContainerImage
-    enableManagedIdentity: enableManagedIdentity
     containerRegistryServer: resolvedRegistryServer
     containerRegistryUsername: resolvedRegistryUsername
     containerRegistryPassword: resolvedRegistryPassword
+    storageAccountName: storage.outputs.storageAccountName
     storageAccountKey: storage.outputs.storageAccountKey
     storjBucketName: storjBucketName
     storjRemoteName: storjRemoteName
     hashLength: hashLength
     maxWorkers: maxWorkers
     keyVaultUri: keyVault.outputs.keyVaultUri
-    useKeyVault: true
+    useKeyVault: false  // 初回デプロイ後、Key Vaultにシークレットを追加してからtrueに変更
     rcloneConfig: rcloneConfig
   }
   dependsOn: [
-    storageConfig
-    storageConfigUploaded
-    keyVault
+    storage
   ]
 }
 
 // Grant Key Vault Secrets User role to Storj Uploader Managed Identity
 resource storjKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.outputs.keyVaultId, storjUploader.outputs.containerAppName, 'KeyVaultSecretsUser')
+  name: guid(resourceGroup().id, keyVaultName, storjAppName, 'KeyVaultSecretsUser')
   scope: resourceGroup()
   properties: {
     principalId: storjUploader.outputs.principalId
@@ -259,6 +230,7 @@ resource storjKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01
   }
   dependsOn: [
     storjUploader
+    keyVault
   ]
 }
 
