@@ -30,6 +30,16 @@ param storageAccountName string
 @secure()
 param storageAccountKey string
 
+@description('Key Vault URI for secrets')
+param keyVaultUri string = ''
+
+@description('Use Key Vault for rclone config')
+param useKeyVault bool = true
+
+@description('rclone.conf content (fallback if not using Key Vault)')
+@secure()
+param rcloneConfig string = ''
+
 @description('Storj Bucket Name')
 param storjBucketName string
 
@@ -45,7 +55,7 @@ param apiBaseUrl string
 resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
-  identity: enableManagedIdentity ? {
+  identity: (enableManagedIdentity || (useKeyVault && !empty(keyVaultUri))) ? {
     type: 'SystemAssigned'
   } : null
   properties: {
@@ -76,6 +86,17 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'storage-key'
           value: storageAccountKey
+        }
+      ], useKeyVault && !empty(keyVaultUri) ? [
+        {
+          name: 'rclone-config'
+          keyVaultUrl: '${keyVaultUri}secrets/rclone-config'
+          identity: 'system'
+        }
+      ] : [
+        {
+          name: 'rclone-config'
+          value: rcloneConfig
         }
       ], empty(containerRegistryPassword) ? [] : [
         {
@@ -120,6 +141,10 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'STORJ_REMOTE_NAME'
               value: storjRemoteName
+            }
+            {
+              name: 'RCLONE_CONFIG'
+              secretRef: 'rclone-config'
             }
             {
               name: 'API_HOST'
@@ -188,3 +213,4 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
 
 output fqdn string = backendApi.properties.configuration.ingress.fqdn
 output containerAppName string = backendApi.name
+output principalId string = backendApi.identity.principalId

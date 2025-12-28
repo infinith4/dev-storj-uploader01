@@ -26,7 +26,9 @@ COPY . /app
 # Ensure runtime directories exist
 RUN mkdir -p /app/upload_target /app/uploaded
 
-# Default command (override in docker run or compose as needed)
-CMD ["python3", "storj_uploader.py"]
+# Copy and setup entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-
+# Use entrypoint script
+ENTRYPOINT ["/docker-entrypoint.sh"]

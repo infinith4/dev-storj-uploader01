@@ -24,6 +24,16 @@ except ImportError:
 class StorjUploader:
     def __init__(self):
         load_dotenv()
+
+        # Check rclone configuration
+        rclone_config_path = Path.home() / '.config' / 'rclone' / 'rclone.conf'
+        if rclone_config_path.exists():
+            print(f"✓ rclone.conf found at: {rclone_config_path}")
+            print(f"  File size: {rclone_config_path.stat().st_size} bytes")
+        else:
+            print(f"✗ WARNING: rclone.conf NOT found at: {rclone_config_path}")
+            print(f"  RCLONE_CONFIG env var set: {'Yes' if os.getenv('RCLONE_CONFIG') else 'No'}")
+
         self.bucket_name = os.getenv('STORJ_BUCKET_NAME', 'default-bucket')
         self.remote_name = os.getenv('STORJ_REMOTE_NAME', 'storj')
         self.hash_length = int(os.getenv('HASH_LENGTH', '10'))
