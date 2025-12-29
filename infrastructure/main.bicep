@@ -181,6 +181,9 @@ module backendApi 'modules/backend-api.bicep' = {
     containerRegistryPassword: resolvedRegistryPassword
     storageAccountName: storage.outputs.storageAccountName
     storageAccountKey: storage.outputs.storageAccountKey
+    keyVaultUri: keyVault.outputs.keyVaultUri
+    useKeyVault: true  // Key Vaultからrclone.confを読み込む
+    rcloneConfig: rcloneConfig
     storjBucketName: storjBucketName
     storjRemoteName: storjRemoteName
     maxFileSize: maxFileSize
@@ -190,6 +193,21 @@ module backendApi 'modules/backend-api.bicep' = {
     storageConfigTemp
     storageConfigThumbnail
     storage
+  ]
+}
+
+// Grant Key Vault Secrets User role to Backend API Managed Identity
+resource backendKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, keyVaultName, backendAppName, 'KeyVaultSecretsUser')
+  scope: resourceGroup()
+  properties: {
+    principalId: backendApi.outputs.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    principalType: 'ServicePrincipal'
+  }
+  dependsOn: [
+    backendApi
+    keyVault
   ]
 }
 
@@ -211,7 +229,7 @@ module storjUploader 'modules/storj-uploader.bicep' = {
     hashLength: hashLength
     maxWorkers: maxWorkers
     keyVaultUri: keyVault.outputs.keyVaultUri
-    useKeyVault: false  // 初回デプロイ後、Key Vaultにシークレットを追加してからtrueに変更
+    useKeyVault: true  // Key Vaultからrclone.confを読み込む
     rcloneConfig: rcloneConfig
   }
   dependsOn: [

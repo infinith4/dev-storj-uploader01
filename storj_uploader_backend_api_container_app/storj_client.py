@@ -37,6 +37,8 @@ class StorjClient:
         self.storj_app_path = Path(storj_app_path)
         self.storj_script = self.storj_app_path / "storj_uploader.py"
         self.lock = threading.Lock()
+        self._rclone_config_path = None
+        self._rclone_config_lock = threading.Lock()
 
         # 同時実行制限: rcloneコマンドの並行実行を最大5つに制限
         self.rclone_semaphore = threading.Semaphore(30)
@@ -66,6 +68,91 @@ class StorjClient:
             if self.storj_app_path.exists():
                 print(f"Contents: {list(self.storj_app_path.iterdir())}")
         return exists
+
+    def _looks_like_rclone_config(self, value: str) -> bool:
+        if "\n" in value:
+            return True
+        stripped = value.strip()
+        if stripped.startswith("[") and "]" in stripped:
+            return True
+        if "type =" in value or "access_grant" in value:
+            return True
+        return False
+
+    def _write_rclone_config_content(self, config_text: str) -> Optional[Path]:
+        temp_dir = Path(os.getenv("TEMP_DIR", "/tmp"))
+        try:
+            temp_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Failed to create temp dir for rclone config: {e}")
+            return None
+
+        temp_path = temp_dir / "rclone.conf"
+        try:
+            temp_path.write_text(config_text, encoding="utf-8")
+            os.chmod(temp_path, 0o600)
+            return temp_path
+        except Exception as e:
+            print(f"Failed to write rclone config content: {e}")
+            return None
+
+    def _get_rclone_config_path(self) -> Tuple[Optional[Path], Optional[str]]:
+        with self._rclone_config_lock:
+            if self._rclone_config_path and self._rclone_config_path.exists():
+                return self._rclone_config_path, None
+
+            searched_paths = []
+
+            env_value = os.getenv("RCLONE_CONFIG")
+            if env_value:
+                looks_like_config = self._looks_like_rclone_config(env_value)
+                if looks_like_config or len(env_value) > 256:
+                    temp_path = self._write_rclone_config_content(env_value)
+                    if temp_path and temp_path.exists():
+                        self._rclone_config_path = temp_path
+                        return temp_path, None
+                else:
+                    candidate = Path(env_value).expanduser()
+                    try:
+                        if candidate.is_file():
+                            self._rclone_config_path = candidate
+                            return candidate, None
+                    except OSError as e:
+                        print(f"Invalid rclone config path from env: {e}")
+
+                    searched_paths.append(candidate)
+                    if not candidate.is_absolute():
+                        searched_paths.append((self.storj_app_path / candidate).resolve())
+
+            default_paths = [
+                Path.home() / ".config" / "rclone" / "rclone.conf",
+                Path("/root/.config/rclone/rclone.conf"),
+                Path("/app/config/rclone.conf"),
+                self.storj_app_path / "rclone.conf",
+                Path.cwd() / "rclone.conf"
+            ]
+
+            for path in default_paths:
+                if path not in searched_paths:
+                    searched_paths.append(path)
+
+            for path in searched_paths:
+                if path.exists():
+                    self._rclone_config_path = path
+                    return path, None
+
+            message = "rclone.conf not found. Checked: " + ", ".join(str(path) for path in searched_paths)
+            return None, message
+
+    def _get_rclone_env(self, require_config: bool = True) -> Tuple[dict, Optional[str]]:
+        env = os.environ.copy()
+        rclone_conf, error_message = self._get_rclone_config_path()
+        if rclone_conf and rclone_conf.exists():
+            env["RCLONE_CONFIG"] = str(rclone_conf)
+            return env, None
+        if require_config:
+            return env, error_message or "rclone.conf not found"
+        return env, None
 
     def get_upload_target_dir(self) -> Path:
         """アップロード対象ディレクトリのパスを取得"""
@@ -106,12 +193,9 @@ class StorjClient:
                 print(f"Script path: {self.storj_script}")
 
                 # 環境変数を準備 (rclone設定パスなど)
-                env = os.environ.copy()
-
-                # rclone.confのパスを設定
-                rclone_conf = self.storj_app_path / "rclone.conf"
-                if rclone_conf.exists():
-                    env['RCLONE_CONFIG'] = str(rclone_conf)
+                env, error_message = self._get_rclone_env(require_config=False)
+                if error_message:
+                    print(f"Warning: {error_message}")
 
                 # storj_container_appディレクトリで実行
                 result = subprocess.run(
@@ -198,13 +282,9 @@ class StorjClient:
                 bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
             remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
 
-            # rclone.confのパスを設定
-            rclone_conf = self.storj_app_path / "rclone.conf"
-            if not rclone_conf.exists():
-                return False, [], f"rclone.conf not found at {rclone_conf}"
-
-            env = os.environ.copy()
-            env["RCLONE_CONFIG"] = str(rclone_conf)
+            env, error_message = self._get_rclone_env()
+            if error_message:
+                return False, [], error_message
 
             # rclone lsf コマンドでファイルリストを取得
             # Format: path;size;time
@@ -339,13 +419,9 @@ class StorjClient:
                     bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
                 remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
 
-                # rclone.confのパスを設定
-                rclone_conf = self.storj_app_path / "rclone.conf"
-                if not rclone_conf.exists():
-                    return False, b"", f"rclone.conf not found at {rclone_conf}"
-
-                env = os.environ.copy()
-                env["RCLONE_CONFIG"] = str(rclone_conf)
+                env, error_message = self._get_rclone_env()
+                if error_message:
+                    return False, b"", error_message
 
                 # rclone cat コマンドでファイルを取得
                 remote_path = f"{remote_name}:{bucket_name}/{image_path}"
@@ -396,13 +472,9 @@ class StorjClient:
                     bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
                 remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
 
-                # rclone.confのパスを設定
-                rclone_conf = self.storj_app_path / "rclone.conf"
-                if not rclone_conf.exists():
-                    return False, b"", f"rclone.conf not found at {rclone_conf}"
-
-                env = os.environ.copy()
-                env["RCLONE_CONFIG"] = str(rclone_conf)
+                env, error_message = self._get_rclone_env()
+                if error_message:
+                    return False, b"", error_message
 
                 # サムネイルファイル名を生成（拡張子を.jpgに変更）
                 thumbnail_path = "thumbnails/" + image_path.rsplit('.', 1)[0] + '.jpg'

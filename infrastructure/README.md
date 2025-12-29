@@ -157,6 +157,7 @@ access_grant = your-storj-access-grant-here
 ```
 
 **セキュリティ推奨**: 本番環境では `rcloneConfig` を直接パラメータファイルに記載せず、Azure Key Vault を使用してください。
+Backend API も Storj の画像一覧取得に rclone 設定が必要なため、同じシークレットを参照します。
 
 ### 4. Bicep デプロイの実行
 
@@ -397,6 +398,7 @@ az keyvault secret set \
 # Container App から Key Vault へのアクセス権限を付与
 # (Managed Identity を使用)
 ```
+Backend API と Storj Uploader の両方が `rclone-config` を参照します。
 
 ### ネットワークセキュリティ
 
