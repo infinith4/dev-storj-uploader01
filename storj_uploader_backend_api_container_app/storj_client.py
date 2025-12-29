@@ -105,18 +105,21 @@ class StorjClient:
 
             env_value = os.getenv("RCLONE_CONFIG")
             if env_value:
-                candidate = Path(env_value).expanduser()
-                if candidate.is_file():
-                    self._rclone_config_path = candidate
-                    return candidate, None
-
                 looks_like_config = self._looks_like_rclone_config(env_value)
-                if looks_like_config:
+                if looks_like_config or len(env_value) > 256:
                     temp_path = self._write_rclone_config_content(env_value)
                     if temp_path and temp_path.exists():
                         self._rclone_config_path = temp_path
                         return temp_path, None
                 else:
+                    candidate = Path(env_value).expanduser()
+                    try:
+                        if candidate.is_file():
+                            self._rclone_config_path = candidate
+                            return candidate, None
+                    except OSError as e:
+                        print(f"Invalid rclone config path from env: {e}")
+
                     searched_paths.append(candidate)
                     if not candidate.is_absolute():
                         searched_paths.append((self.storj_app_path / candidate).resolve())
