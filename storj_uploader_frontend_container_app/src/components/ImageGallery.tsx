@@ -19,7 +19,15 @@ const ImageGallery: React.FC = () => {
       const response = await StorjUploaderAPI.getStorjImages({ limit: 100, offset: 0 });
 
       if (response.success) {
-        setImages(response.images);
+        const sortedImages = [...response.images].sort((a, b) => {
+          const aTime = Date.parse(a.modified_time.replace(' ', 'T'));
+          const bTime = Date.parse(b.modified_time.replace(' ', 'T'));
+          if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+            return b.modified_time.localeCompare(a.modified_time);
+          }
+          return bTime - aTime;
+        });
+        setImages(sortedImages);
       } else {
         setError(response.message || '画像の取得に失敗しました');
       }

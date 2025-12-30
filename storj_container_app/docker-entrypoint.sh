@@ -20,15 +20,17 @@ if [ -n "$RCLONE_CONFIG" ]; then
     if [ "$is_content" -eq 1 ]; then
         echo "Writing rclone configuration from RCLONE_CONFIG content..."
         printf '%s' "$RCLONE_CONFIG" > "$RCLONE_CONFIG_PATH"
-        export RCLONE_CONFIG="$RCLONE_CONFIG_PATH"
-        echo "✓ rclone.conf created successfully"
+        # Unset RCLONE_CONFIG so rclone uses the default path
+        unset RCLONE_CONFIG
+        echo "✓ rclone.conf created successfully at $RCLONE_CONFIG_PATH"
     elif [ -f "$RCLONE_CONFIG" ]; then
         echo "Using rclone configuration file from RCLONE_CONFIG path: $RCLONE_CONFIG"
     else
         echo "Writing rclone configuration from RCLONE_CONFIG content..."
         printf '%s' "$RCLONE_CONFIG" > "$RCLONE_CONFIG_PATH"
-        export RCLONE_CONFIG="$RCLONE_CONFIG_PATH"
-        echo "✓ rclone.conf created successfully (RCLONE_CONFIG treated as content)"
+        # Unset RCLONE_CONFIG so rclone uses the default path
+        unset RCLONE_CONFIG
+        echo "✓ rclone.conf created successfully at $RCLONE_CONFIG_PATH (RCLONE_CONFIG treated as content)"
     fi
 
     # 設定を検証（センシティブ情報を隠す）

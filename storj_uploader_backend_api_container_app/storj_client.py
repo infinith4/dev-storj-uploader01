@@ -253,17 +253,28 @@ class StorjClient:
 
         try:
             target_files = self.count_files_in_target()
-            uploaded_files = len([f for f in uploaded_dir.iterdir() if f.is_file()]) if uploaded_dir.exists() else 0
+            if self.blob_helper:
+                uploaded_files = self.blob_helper.get_blob_count(
+                    container_name=self.blob_helper.uploaded_container
+                )
+            else:
+                uploaded_files = len([f for f in uploaded_dir.iterdir() if f.is_file()]) if uploaded_dir.exists() else 0
+
+            storj_app_local = self.check_storj_app_available()
+            cloud_env = os.getenv("CLOUD_ENV", "").lower()
+            storj_app_available = storj_app_local or (self.blob_helper and cloud_env == "azure")
+            storj_app_mode = "local" if storj_app_local else ("blob" if self.blob_helper else "unknown")
 
             return {
-                "storj_app_available": self.check_storj_app_available(),
+                "storj_app_available": storj_app_available,
+                "storj_app_mode": storj_app_mode,
                 "storj_app_path": str(self.storj_app_path),
                 "upload_target_dir": str(target_dir),
                 "uploaded_dir": str(uploaded_dir),
                 "files_in_target": target_files,
                 "files_uploaded": uploaded_files,
-                "target_dir_exists": target_dir.exists(),
-                "uploaded_dir_exists": uploaded_dir.exists()
+                "target_dir_exists": target_dir.exists() or bool(self.blob_helper),
+                "uploaded_dir_exists": uploaded_dir.exists() or bool(self.blob_helper)
             }
         except Exception as e:
             return {
