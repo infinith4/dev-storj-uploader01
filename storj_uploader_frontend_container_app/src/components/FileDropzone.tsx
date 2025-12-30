@@ -10,6 +10,8 @@ interface FileDropzoneProps {
   maxFiles?: number;
   disabled?: boolean;
   className?: string;
+  dropzoneTestId?: string;
+  inputTestId?: string;
 }
 
 const FileDropzone: React.FC<FileDropzoneProps> = ({
@@ -18,6 +20,8 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
   maxFiles = 10,
   disabled = false,
   className = '',
+  dropzoneTestId,
+  inputTestId,
 }) => {
   const getAcceptConfig = () => {
     const config: { [key: string]: string[] } = {};
@@ -100,6 +104,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
   return (
     <div
       {...getRootProps()}
+      data-testid={dropzoneTestId}
       className={`
         w-full p-8 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200
         ${getBorderColor()}
@@ -108,7 +113,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
         ${className}
       `}
     >
-      <input {...getInputProps()} />
+      <input {...getInputProps()} data-testid={inputTestId} />
       <div className="flex flex-col items-center justify-center text-center space-y-4">
         {getIcon()}
         <div>

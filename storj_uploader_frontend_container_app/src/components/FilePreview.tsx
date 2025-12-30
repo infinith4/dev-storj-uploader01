@@ -54,7 +54,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   };
 
   return (
-    <div className={`relative border rounded-lg p-4 ${getStatusColor()}`}>
+    <div
+      className={`relative border rounded-lg p-4 ${getStatusColor()}`}
+      data-testid="file-preview"
+      data-status={file.status}
+      data-filename={file.file.name}
+    >
       {showRemove && (
         <button
           onClick={() => onRemove(file.id)}
