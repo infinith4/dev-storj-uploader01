@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import com.example.storjapp.api.RetrofitClient
+import com.example.storjapp.config.UploadConfig
 import com.example.storjapp.model.PhotoItem
 import com.example.storjapp.model.UploadResponse
 import kotlinx.coroutines.Dispatchers
@@ -279,6 +280,143 @@ class PhotoRepository(private val context: Context) {
 
         Log.d(TAG, "Found total ${mediaFiles.size} recent media files (photos + videos, last $hoursAgo hours)")
         mediaFiles
+    }
+
+    /**
+     * Get count of pending uploads (not yet uploaded) separated by type
+     * @return Pair<imageCount, videoCount>
+     */
+    suspend fun getPendingUploadCounts(): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        val uploadedPhotos = getUploadedPhotoUris()
+        var pendingImages = 0
+        var pendingVideos = 0
+
+        // Count pending images
+        val imageProjection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
+        )
+        val imageSelection = "${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN (?, ?, ?)"
+        val imageSelectionArgs = arrayOf("Camera", "カメラ", "Screenshots")
+
+        context.contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            imageProjection,
+            imageSelection,
+            imageSelectionArgs,
+            null
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val uri = Uri.withAppendedPath(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    id.toString()
+                )
+                if (!uploadedPhotos.contains(uri.toString())) {
+                    pendingImages++
+                }
+            }
+        }
+
+        // Count pending videos
+        val videoProjection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.BUCKET_DISPLAY_NAME
+        )
+        val videoSelection = "${MediaStore.Video.Media.BUCKET_DISPLAY_NAME} IN (?, ?)"
+        val videoSelectionArgs = arrayOf("Camera", "カメラ")
+
+        context.contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            videoProjection,
+            videoSelection,
+            videoSelectionArgs,
+            null
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val uri = Uri.withAppendedPath(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    id.toString()
+                )
+                if (!uploadedPhotos.contains(uri.toString())) {
+                    pendingVideos++
+                }
+            }
+        }
+
+        Log.d(TAG, "Pending uploads: $pendingImages images, $pendingVideos videos")
+        Pair(pendingImages, pendingVideos)
+    }
+
+    /**
+     * Check if upload limits are exceeded
+     * @return Triple<isWithinLimit, pendingImageCount, pendingVideoCount>
+     */
+    suspend fun checkUploadLimits(): Triple<Boolean, Int, Int> = withContext(Dispatchers.IO) {
+        val (pendingImages, pendingVideos) = getPendingUploadCounts()
+        val isWithinLimit = pendingImages <= UploadConfig.MAX_IMAGE_UPLOAD_LIMIT &&
+                            pendingVideos <= UploadConfig.MAX_VIDEO_UPLOAD_LIMIT
+
+        Log.d(TAG, "Upload limit check: images=$pendingImages/${UploadConfig.MAX_IMAGE_UPLOAD_LIMIT}, " +
+                "videos=$pendingVideos/${UploadConfig.MAX_VIDEO_UPLOAD_LIMIT}, withinLimit=$isWithinLimit")
+
+        Triple(isWithinLimit, pendingImages, pendingVideos)
+    }
+
+    /**
+     * Filter URIs by upload limits, prioritizing recent files
+     * @param uris List of URIs to filter
+     * @return Filtered list respecting upload limits
+     */
+    suspend fun filterByUploadLimits(uris: List<Uri>): List<Uri> = withContext(Dispatchers.IO) {
+        val uploadedPhotos = getUploadedPhotoUris()
+        val (currentPendingImages, currentPendingVideos) = getPendingUploadCounts()
+
+        var imageQuota = UploadConfig.MAX_IMAGE_UPLOAD_LIMIT - currentPendingImages
+        var videoQuota = UploadConfig.MAX_VIDEO_UPLOAD_LIMIT - currentPendingVideos
+        val filtered = mutableListOf<Uri>()
+
+        Log.d(TAG, "Filtering URIs with quota: images=$imageQuota, videos=$videoQuota")
+
+        for (uri in uris) {
+            // Skip already uploaded
+            if (uploadedPhotos.contains(uri.toString())) {
+                continue
+            }
+
+            // Check if it's a video or image
+            val isVideo = isVideoUri(uri)
+
+            if (isVideo) {
+                if (videoQuota > 0) {
+                    filtered.add(uri)
+                    videoQuota--
+                } else {
+                    Log.w(TAG, "Video quota exceeded, skipping: $uri")
+                }
+            } else {
+                if (imageQuota > 0) {
+                    filtered.add(uri)
+                    imageQuota--
+                } else {
+                    Log.w(TAG, "Image quota exceeded, skipping: $uri")
+                }
+            }
+        }
+
+        Log.d(TAG, "Filtered ${uris.size} URIs to ${filtered.size} within upload limits")
+        filtered
+    }
+
+    /**
+     * Check if URI is a video
+     */
+    private fun isVideoUri(uri: Uri): Boolean {
+        return uri.toString().contains("video", ignoreCase = true) ||
+                context.contentResolver.getType(uri)?.startsWith("video/") == true
     }
 
     /**

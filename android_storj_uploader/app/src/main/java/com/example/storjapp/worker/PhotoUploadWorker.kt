@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.storjapp.config.UploadConfig
 import com.example.storjapp.repository.PhotoRepository
 
 class PhotoUploadWorker(
@@ -28,8 +29,18 @@ class PhotoUploadWorker(
         return try {
             val currentTime = System.currentTimeMillis()
 
+            // Check upload limits before proceeding
+            val (isWithinLimit, pendingImages, pendingVideos) = photoRepository.checkUploadLimits()
+
+            if (!isWithinLimit) {
+                Log.w(TAG, "Upload limits exceeded: images=$pendingImages/${UploadConfig.MAX_IMAGE_UPLOAD_LIMIT}, " +
+                        "videos=$pendingVideos/${UploadConfig.MAX_VIDEO_UPLOAD_LIMIT}")
+                // Still return success to avoid retrying when limits are exceeded
+                return Result.success()
+            }
+
             // Get recent media files (photos and videos, last 24 hours)
-            val recentPhotos = photoRepository.getRecentPhotos(24)
+            val recentPhotos = photoRepository.getRecentPhotos(UploadConfig.RECENT_MEDIA_HOURS)
 
             if (recentPhotos.isEmpty()) {
                 Log.d(TAG, "No recent media files to upload")
@@ -38,11 +49,22 @@ class PhotoUploadWorker(
 
             Log.d(TAG, "Found ${recentPhotos.size} recent media files to upload")
 
-            // Upload media files in batches of 10
-            val batchSize = 10
-            val batches = recentPhotos.chunked(batchSize)
+            // Filter by upload limits (respects quota for images and videos separately)
+            val filteredPhotos = photoRepository.filterByUploadLimits(recentPhotos)
+
+            if (filteredPhotos.isEmpty()) {
+                Log.d(TAG, "No media files within upload limits")
+                return Result.success()
+            }
+
+            Log.d(TAG, "Uploading ${filteredPhotos.size} media files (within upload limits)")
+
+            // Upload media files in batches
+            val batchSize = UploadConfig.UPLOAD_BATCH_SIZE
+            val batches = filteredPhotos.chunked(batchSize)
             var successCount = 0
             var failureCount = 0
+            var skippedCount = recentPhotos.size - filteredPhotos.size
 
             for ((index, batch) in batches.withIndex()) {
                 Log.d(TAG, "Uploading batch ${index + 1}/${batches.size} (${batch.size} media files)")
@@ -60,7 +82,7 @@ class PhotoUploadWorker(
                 }
             }
 
-            Log.d(TAG, "Upload completed: $successCount succeeded, $failureCount failed")
+            Log.d(TAG, "Upload completed: $successCount succeeded, $failureCount failed, $skippedCount skipped (quota)")
 
             // Update last upload time
             prefs.edit().putLong(KEY_LAST_UPLOAD_TIME, currentTime).apply()

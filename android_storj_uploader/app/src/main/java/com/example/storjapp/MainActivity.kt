@@ -23,6 +23,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.*
 import androidx.work.OneTimeWorkRequestBuilder
 import com.example.storjapp.adapter.PhotoGridAdapter
+import com.example.storjapp.config.UploadConfig
 import com.example.storjapp.repository.PhotoRepository
 import com.example.storjapp.worker.PhotoUploadWorker
 import kotlinx.coroutines.launch
@@ -38,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsButton: Button
     private lateinit var statusText: TextView
     private lateinit var healthCheckText: TextView
+    private lateinit var uploadQuotaText: TextView
     private lateinit var photoGridRecyclerView: RecyclerView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var prefs: SharedPreferences
@@ -45,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gridAdapter: PhotoGridAdapter
     private var permissionChecked = false
     private var healthCheckJob: kotlinx.coroutines.Job? = null
+    private var quotaCheckJob: kotlinx.coroutines.Job? = null
 
     // Permission launcher for multiple permissions
     private val requestPermissionLauncher = registerForActivityResult(
@@ -75,6 +78,7 @@ class MainActivity : AppCompatActivity() {
         settingsButton = findViewById(R.id.settingsButton)
         statusText = findViewById(R.id.statusText)
         healthCheckText = findViewById(R.id.healthCheckText)
+        uploadQuotaText = findViewById(R.id.uploadQuotaText)
         photoGridRecyclerView = findViewById(R.id.photoGridRecyclerView)
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
 
@@ -124,6 +128,9 @@ class MainActivity : AppCompatActivity() {
 
         // Start periodic health check
         startHealthCheck()
+
+        // Start periodic upload quota check
+        startUploadQuotaCheck()
     }
 
     override fun onResume() {
@@ -142,8 +149,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Cancel health check job
+        // Cancel background jobs
         healthCheckJob?.cancel()
+        quotaCheckJob?.cancel()
     }
 
 
@@ -282,5 +290,47 @@ class MainActivity : AppCompatActivity() {
         }
 
         popupMenu.show()
+    }
+
+    private fun startUploadQuotaCheck() {
+        quotaCheckJob?.cancel()
+        quotaCheckJob = lifecycleScope.launch {
+            while (true) {
+                performUploadQuotaCheck()
+                kotlinx.coroutines.delay(30000) // 30 seconds
+            }
+        }
+    }
+
+    private suspend fun performUploadQuotaCheck() {
+        try {
+            val (isWithinLimit, pendingImages, pendingVideos) = photoRepository.checkUploadLimits()
+            updateUploadQuotaUI(isWithinLimit, pendingImages, pendingVideos)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking upload quota", e)
+        }
+    }
+
+    private fun updateUploadQuotaUI(isWithinLimit: Boolean, pendingImages: Int, pendingVideos: Int) {
+        val quotaText = "Upload Queue: $pendingImages/${UploadConfig.MAX_IMAGE_UPLOAD_LIMIT} images, " +
+                "$pendingVideos/${UploadConfig.MAX_VIDEO_UPLOAD_LIMIT} videos"
+
+        uploadQuotaText.text = quotaText
+
+        if (!isWithinLimit) {
+            uploadQuotaText.setTextColor(getColor(android.R.color.holo_red_dark))
+            Toast.makeText(
+                this,
+                "Upload limit exceeded! Images: $pendingImages/${UploadConfig.MAX_IMAGE_UPLOAD_LIMIT}, " +
+                        "Videos: $pendingVideos/${UploadConfig.MAX_VIDEO_UPLOAD_LIMIT}",
+                Toast.LENGTH_LONG
+            ).show()
+        } else if (pendingImages > UploadConfig.MAX_IMAGE_UPLOAD_LIMIT * 0.8 ||
+                   pendingVideos > UploadConfig.MAX_VIDEO_UPLOAD_LIMIT * 0.8) {
+            // Warning when approaching limit (>80%)
+            uploadQuotaText.setTextColor(getColor(android.R.color.holo_orange_dark))
+        } else {
+            uploadQuotaText.setTextColor(getColor(android.R.color.darker_gray))
+        }
     }
 }

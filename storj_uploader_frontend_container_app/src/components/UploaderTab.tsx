@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Upload as UploadIcon } from 'lucide-react';
+import { Upload as UploadIcon, AlertTriangle } from 'lucide-react';
 import FileDropzone from './FileDropzone';
 import FilePreview from './FilePreview';
 import { UploadFile, FileType, UploadResponse } from '../types';
 import { StorjUploaderAPI, createPreviewUrl } from '../api';
+import { UPLOAD_CONFIG } from '../config/uploadConfig';
 
 interface UploaderTabProps {
   type: 'image' | 'video' | 'file';
@@ -24,7 +25,47 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Calculate upload limit based on type
+  const uploadLimit = useMemo(() => {
+    if (type === 'video') {
+      return UPLOAD_CONFIG.MAX_VIDEO_UPLOAD_LIMIT;
+    } else if (type === 'image') {
+      return UPLOAD_CONFIG.MAX_IMAGE_UPLOAD_LIMIT;
+    }
+    // For 'file' type, use image limit as it may contain both
+    return UPLOAD_CONFIG.MAX_IMAGE_UPLOAD_LIMIT;
+  }, [type]);
+
+  // Check if approaching or exceeding limit
+  const limitStatus = useMemo(() => {
+    const pendingCount = files.filter(f => f.status === 'pending').length;
+    const isExceeded = pendingCount > uploadLimit;
+    const isWarning = pendingCount > uploadLimit * UPLOAD_CONFIG.WARNING_THRESHOLD;
+
+    return {
+      count: pendingCount,
+      limit: uploadLimit,
+      isExceeded,
+      isWarning: !isExceeded && isWarning,
+      percentage: (pendingCount / uploadLimit) * 100,
+    };
+  }, [files, uploadLimit]);
+
   const addFiles = useCallback((newFiles: File[]) => {
+    const pendingCount = files.filter(f => f.status === 'pending').length;
+
+    // Check if adding these files would exceed the limit
+    if (pendingCount + newFiles.length > uploadLimit) {
+      const allowedCount = uploadLimit - pendingCount;
+      if (allowedCount <= 0) {
+        alert(`アップロード上限（${uploadLimit}件）に達しています。これ以上ファイルを追加できません。`);
+        return;
+      }
+
+      alert(`アップロード上限（${uploadLimit}件）を超えるため、${allowedCount}件のみ追加します。`);
+      newFiles = newFiles.slice(0, allowedCount);
+    }
+
     const uploadFiles: UploadFile[] = newFiles.map(file => ({
       id: uuidv4(),
       file,
@@ -34,7 +75,7 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
     }));
 
     setFiles(prev => [...prev, ...uploadFiles]);
-  }, []);
+  }, [files, uploadLimit]);
 
   const removeFile = useCallback((id: string) => {
     setFiles(prev => {
@@ -145,12 +186,57 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
         <p className="text-gray-600 mb-4">{description}</p>
       </div>
 
+      {/* Upload Limit Warning */}
+      {(limitStatus.isWarning || limitStatus.isExceeded) && (
+        <div className={`p-4 rounded-lg border ${
+          limitStatus.isExceeded
+            ? 'bg-red-50 border-red-200'
+            : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${
+              limitStatus.isExceeded ? 'text-red-600' : 'text-yellow-600'
+            }`} />
+            <div className="flex-1">
+              <p className={`font-semibold ${
+                limitStatus.isExceeded ? 'text-red-800' : 'text-yellow-800'
+              }`}>
+                {limitStatus.isExceeded
+                  ? 'アップロード上限を超えています'
+                  : 'アップロード上限に近づいています'}
+              </p>
+              <p className={`text-sm mt-1 ${
+                limitStatus.isExceeded ? 'text-red-700' : 'text-yellow-700'
+              }`}>
+                現在の待機ファイル数: {limitStatus.count} / {limitStatus.limit} ({limitStatus.percentage.toFixed(1)}%)
+              </p>
+              {limitStatus.isExceeded && (
+                <p className="text-sm mt-2 text-red-700">
+                  上限を超えたファイルはアップロードできません。不要なファイルを削除してください。
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Quota Display */}
+      <div className="text-center">
+        <p className={`text-sm ${
+          limitStatus.isExceeded ? 'text-red-600 font-semibold' :
+          limitStatus.isWarning ? 'text-yellow-600 font-semibold' :
+          'text-gray-500'
+        }`}>
+          アップロード待機数: {limitStatus.count} / {limitStatus.limit}
+        </p>
+      </div>
+
       {/* ドロップゾーン */}
       <FileDropzone
         onFilesAdded={addFiles}
         acceptedTypes={acceptedTypes}
         maxFiles={maxFiles}
-        disabled={isUploading}
+        disabled={isUploading || limitStatus.isExceeded}
         dropzoneTestId={`${type}-dropzone`}
         inputTestId={`${type}-file-input`}
       />
@@ -177,9 +263,10 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
               {pendingCount > 0 && (
                 <button
                   onClick={uploadFiles}
-                  disabled={isUploading}
+                  disabled={isUploading || limitStatus.isExceeded}
                   data-testid={`${type}-upload-button`}
                   className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title={limitStatus.isExceeded ? 'アップロード上限を超えています' : ''}
                 >
                   <UploadIcon className="w-4 h-4" />
                   {isUploading ? 'アップロード中...' : `アップロード (${pendingCount})`}
