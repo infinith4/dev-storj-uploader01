@@ -30,6 +30,13 @@ class StorjUploader:
         if rclone_config_path.exists():
             print(f"✓ rclone.conf found at: {rclone_config_path}")
             print(f"  File size: {rclone_config_path.stat().st_size} bytes")
+            # Remove RCLONE_CONFIG env var if it contains content (not a path)
+            if 'RCLONE_CONFIG' in os.environ:
+                rclone_config_value = os.getenv('RCLONE_CONFIG', '')
+                if '\n' in rclone_config_value or '[' in rclone_config_value:
+                    print("  Removing RCLONE_CONFIG env var (contains config content, not path)")
+                    os.environ.pop('RCLONE_CONFIG', None)
+                    print("  ✓ RCLONE_CONFIG env var removed, rclone will use default path")
         else:
             print(f"✗ WARNING: rclone.conf NOT found at: {rclone_config_path}")
             print(f"  RCLONE_CONFIG env var set: {'Yes' if os.getenv('RCLONE_CONFIG') else 'No'}")

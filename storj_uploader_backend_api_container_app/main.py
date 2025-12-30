@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List
 import uuid
 from datetime import datetime
+import hashlib
 import aiofiles
 from PIL import Image
 import io
@@ -821,9 +822,12 @@ async def get_storj_image(
 
         # Add cache headers (cache for 1 day for thumbnails, 1 hour for full images)
         cache_max_age = 86400 if thumbnail else 3600  # 1 day or 1 hour
+        etag_source = f"{image_path}|{'thumb' if thumbnail else 'full'}"
+        etag_hash = hashlib.sha256(etag_source.encode("utf-8")).hexdigest()
         headers = {
             "Cache-Control": f"public, max-age={cache_max_age}",
-            "ETag": f'"{image_path}{"_thumb" if thumbnail else ""}"'
+            # Keep ETag ASCII-safe even for non-ASCII filenames.
+            "ETag": f"\"sha256-{etag_hash}\""
         }
 
         return Response(content=image_data, media_type=content_type, headers=headers)
