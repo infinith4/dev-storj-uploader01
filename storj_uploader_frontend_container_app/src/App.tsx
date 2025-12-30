@@ -121,6 +121,7 @@ const App: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                data-testid={`tab-${tab.id}`}
                 className={`
                   flex-1 flex items-center justify-center px-3 py-3 text-sm font-medium rounded-md transition-all
                   ${activeTab === tab.id

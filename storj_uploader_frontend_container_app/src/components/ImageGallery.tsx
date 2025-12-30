@@ -75,6 +75,7 @@ const ImageGallery: React.FC = () => {
         <button
           onClick={loadImages}
           disabled={isLoading}
+          data-testid="gallery-refresh"
           className={`
             flex items-center px-4 py-2 rounded-lg border transition-all
             ${isLoading
@@ -90,7 +91,7 @@ const ImageGallery: React.FC = () => {
 
       {/* ローディング状態 */}
       {isLoading && (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-12" data-testid="gallery-loading">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
             <p className="text-gray-600">画像を読み込み中...</p>
@@ -100,7 +101,7 @@ const ImageGallery: React.FC = () => {
 
       {/* エラー状態 */}
       {!isLoading && error && (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-12" data-testid="gallery-error">
           <div className="text-center">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <p className="text-red-600 font-medium mb-2">エラーが発生しました</p>
@@ -117,7 +118,7 @@ const ImageGallery: React.FC = () => {
 
       {/* 画像がない場合 */}
       {!isLoading && !error && images.length === 0 && (
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-12" data-testid="gallery-empty">
           <div className="text-center">
             <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600 font-medium mb-2">画像がありません</p>
@@ -132,10 +133,14 @@ const ImageGallery: React.FC = () => {
           <div className="mb-4 text-sm text-gray-600">
             {images.length}件の画像が見つかりました
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+            data-testid="gallery-grid"
+          >
             {images.map((image, index) => (
               <div
                 key={`${image.path}-${index}`}
+                data-testid="gallery-item"
                 className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-105"
                 onClick={() => handleImageClick(image)}
               >

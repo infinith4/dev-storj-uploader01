@@ -151,6 +151,8 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
         acceptedTypes={acceptedTypes}
         maxFiles={maxFiles}
         disabled={isUploading}
+        dropzoneTestId={`${type}-dropzone`}
+        inputTestId={`${type}-file-input`}
       />
 
       {/* ファイルリスト */}
@@ -176,6 +178,7 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
                 <button
                   onClick={uploadFiles}
                   disabled={isUploading}
+                  data-testid={`${type}-upload-button`}
                   className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <UploadIcon className="w-4 h-4" />

@@ -8,9 +8,28 @@ mkdir -p /root/.config/rclone
 
 # RCLONE_CONFIG環境変数からrclone.confを生成
 if [ -n "$RCLONE_CONFIG" ]; then
-    echo "Writing rclone configuration from RCLONE_CONFIG environment variable..."
-    echo "$RCLONE_CONFIG" > /root/.config/rclone/rclone.conf
-    echo "✓ rclone.conf created successfully"
+    RCLONE_CONFIG_PATH="/root/.config/rclone/rclone.conf"
+    is_content=0
+    if printf '%s' "$RCLONE_CONFIG" | grep -q $'\n'; then
+        is_content=1
+    fi
+    if printf '%s' "$RCLONE_CONFIG" | grep -qE '^\[.+\]|type =|access_grant|satellite_address'; then
+        is_content=1
+    fi
+
+    if [ "$is_content" -eq 1 ]; then
+        echo "Writing rclone configuration from RCLONE_CONFIG content..."
+        printf '%s' "$RCLONE_CONFIG" > "$RCLONE_CONFIG_PATH"
+        export RCLONE_CONFIG="$RCLONE_CONFIG_PATH"
+        echo "✓ rclone.conf created successfully"
+    elif [ -f "$RCLONE_CONFIG" ]; then
+        echo "Using rclone configuration file from RCLONE_CONFIG path: $RCLONE_CONFIG"
+    else
+        echo "Writing rclone configuration from RCLONE_CONFIG content..."
+        printf '%s' "$RCLONE_CONFIG" > "$RCLONE_CONFIG_PATH"
+        export RCLONE_CONFIG="$RCLONE_CONFIG_PATH"
+        echo "✓ rclone.conf created successfully (RCLONE_CONFIG treated as content)"
+    fi
 
     # 設定を検証（センシティブ情報を隠す）
     echo "Verifying rclone configuration..."
