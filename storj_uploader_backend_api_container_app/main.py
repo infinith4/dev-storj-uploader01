@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 from typing import List
 import uuid
+import tempfile
 from datetime import datetime
 import hashlib
 import aiofiles
@@ -86,6 +87,71 @@ def _parse_range_header(range_header: str, file_size: int):
 def _get_video_content_type(filename: str) -> str:
     ext = Path(filename).suffix.lower()
     return VIDEO_MIME_TYPES.get(ext, "application/octet-stream")
+
+
+def _generate_video_thumbnail(
+    video_path: str,
+    bucket: str,
+    width: int = 320,
+    height: int = 240
+) -> tuple:
+    cache_dir = Path(__file__).parent / "thumbnail_cache"
+    cache_dir.mkdir(exist_ok=True)
+    cache_filename = video_path.replace("/", "_").replace("\\", "_")
+    cache_path = cache_dir / cache_filename
+
+    if cache_path.exists() and cache_path.stat().st_size > 0:
+        return True, cache_path.read_bytes(), "Success (cached)"
+
+    success, video_data, error_msg = storj_client.get_storj_image(
+        image_path=video_path,
+        bucket_name=bucket
+    )
+    if not success:
+        return False, b"", error_msg
+
+    temp_dir = Path(os.getenv("TEMP_DIR", "./temp"))
+    temp_dir.mkdir(exist_ok=True, parents=True)
+
+    temp_video = None
+    temp_thumb = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=temp_dir,
+            suffix=Path(video_path).suffix or ".mp4",
+            delete=False
+        ) as temp_file:
+            temp_video = Path(temp_file.name)
+            temp_file.write(video_data)
+
+        temp_thumb = temp_dir / f"{uuid.uuid4().hex}_thumb.jpg"
+
+        generated = VideoProcessor.generate_thumbnail(
+            str(temp_video),
+            str(temp_thumb),
+            width=width,
+            height=height,
+            method="ffmpeg"
+        )
+
+        if not generated or not temp_thumb.exists():
+            return False, b"", "Failed to generate video thumbnail"
+
+        thumb_data = temp_thumb.read_bytes()
+        if not thumb_data:
+            return False, b"", "Generated thumbnail is empty"
+
+        temp_cache_path = cache_path.with_name(cache_path.name + ".tmp")
+        with open(temp_cache_path, "wb") as cache_file:
+            cache_file.write(thumb_data)
+        temp_cache_path.replace(cache_path)
+
+        return True, thumb_data, "Success (generated)"
+    finally:
+        if temp_video and temp_video.exists():
+            temp_video.unlink()
+        if temp_thumb and temp_thumb.exists():
+            temp_thumb.unlink()
 
 try:
     from blob_storage import BlobStorageHelper
@@ -906,6 +972,11 @@ async def get_storj_image(
                     image_path=thumbnail_path,
                     bucket_name=bucket
                 )
+                if not success or not image_data:
+                    success, image_data, error_msg = _generate_video_thumbnail(
+                        video_path=image_path,
+                        bucket=bucket
+                    )
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,

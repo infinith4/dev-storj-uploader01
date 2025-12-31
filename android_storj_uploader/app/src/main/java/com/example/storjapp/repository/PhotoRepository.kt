@@ -133,6 +133,7 @@ class PhotoRepository(private val context: Context) {
                 storjResponse?.images?.forEach { storjImage ->
                     // Only add if not already in local photos
                     if (!localFileNames.contains(storjImage.filename)) {
+                        val isVideo = storjImage.isVideo || isVideoFileName(storjImage.path)
                         // Use thumbnail URL from API response, or construct if not provided
                         val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
                         val thumbnailUrl = storjImage.thumbnailUrl
@@ -148,11 +149,11 @@ class PhotoRepository(private val context: Context) {
                                 storjUrl = thumbnailUrl,
                                 storjPath = storjImage.path,
                                 isFromStorj = true,
-                                isVideo = storjImage.isVideo,
+                                isVideo = isVideo,
                                 size = storjImage.size
                             )
                         )
-                        val mediaType = if (storjImage.isVideo) "video" else "photo"
+                        val mediaType = if (isVideo) "video" else "photo"
                         Log.d(TAG, "Added Storj $mediaType: ${storjImage.filename} with thumbnail URL: $thumbnailUrl")
                     }
                 }
@@ -555,6 +556,12 @@ class PhotoRepository(private val context: Context) {
             }
         }
         return fileName
+    }
+
+    private fun isVideoFileName(fileName: String): Boolean {
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        if (extension.isEmpty()) return false
+        return extension in setOf("mp4", "mov", "avi", "mkv", "webm", "m4v", "3gp", "flv", "wmv")
     }
 
     /**
