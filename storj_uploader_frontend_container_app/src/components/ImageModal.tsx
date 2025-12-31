@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Download, ZoomIn, ZoomOut } from 'lucide-react';
 import { StorjImageItem } from '../types';
 import { StorjUploaderAPI } from '../api';
-import { resolveIsVideo } from '../utils/media';
+import { isVideoPath, resolveIsVideo } from '../utils/media';
 
 interface ImageModalProps {
   image: StorjImageItem;
@@ -14,12 +14,14 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [forceVideo, setForceVideo] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsLoading(true);
       setError(null);
       setZoom(1);
+      setForceVideo(false);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
@@ -34,7 +36,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const isVideo = resolveIsVideo(image);
+  const isVideo = forceVideo || resolveIsVideo(image);
   const imageUrl = StorjUploaderAPI.getStorjImageUrl(image.path);
   const posterUrl = image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path);
 
@@ -175,6 +177,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
               }}
               onLoad={() => setIsLoading(false)}
               onError={() => {
+                if (!forceVideo && isVideoPath(imageUrl)) {
+                  setForceVideo(true);
+                  setIsLoading(true);
+                  setError(null);
+                  return;
+                }
                 setIsLoading(false);
                 setError('画像の読み込みに失敗しました');
               }}
