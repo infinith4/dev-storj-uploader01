@@ -89,6 +89,7 @@ export interface StorjImageItem {
   modified_time: string;
   thumbnail_url?: string | null;
   url?: string | null;
+  is_video?: boolean;
 }
 
 export interface StorjImageListResponse {
