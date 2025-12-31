@@ -3,6 +3,7 @@ import { RefreshCw, AlertCircle, Image as ImageIcon, Video as VideoIcon } from '
 import { StorjImageItem } from '../types';
 import { StorjUploaderAPI } from '../api';
 import ImageModal from './ImageModal';
+import { resolveIsVideo } from '../utils/media';
 
 const ImageGallery: React.FC = () => {
   const [images, setImages] = useState<StorjImageItem[]>([]);
@@ -145,42 +146,46 @@ const ImageGallery: React.FC = () => {
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
             data-testid="gallery-grid"
           >
-            {images.map((image, index) => (
-              <div
-                key={`${image.path}-${index}`}
-                data-testid="gallery-item"
-                className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-105"
-                onClick={() => handleImageClick(image)}
-              >
-                {/* サムネイル画像 */}
-                <img
-                  src={image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path)}
-                  alt={image.filename}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
+            {images.map((image, index) => {
+              const isVideo = resolveIsVideo(image);
 
-                {image.is_video && (
-                  <div className="absolute top-2 left-2 flex items-center px-2 py-1 rounded bg-black bg-opacity-60 text-white text-xs">
-                    <VideoIcon className="w-3 h-3 mr-1" />
-                    動画
-                  </div>
-                )}
+              return (
+                <div
+                  key={`${image.path}-${index}`}
+                  data-testid="gallery-item"
+                  className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-105"
+                  onClick={() => handleImageClick(image)}
+                >
+                  {/* サムネイル画像 */}
+                  <img
+                    src={image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path)}
+                    alt={image.filename}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
 
-                {/* ホバー時のオーバーレイ */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-end p-2">
-                  <div className="transform translate-y-full group-hover:translate-y-0 transition-transform duration-200">
-                    <p className="text-white text-xs font-medium truncate mb-1">
-                      {image.filename}
-                    </p>
-                    <div className="flex items-center justify-between text-white text-xs">
-                      <span>{formatFileSize(image.size)}</span>
-                      <span>{formatDate(image.modified_time)}</span>
+                  {isVideo && (
+                    <div className="absolute top-2 left-2 flex items-center px-2 py-1 rounded bg-black bg-opacity-60 text-white text-xs">
+                      <VideoIcon className="w-3 h-3 mr-1" />
+                      動画
+                    </div>
+                  )}
+
+                  {/* ホバー時のオーバーレイ */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-end p-2">
+                    <div className="transform translate-y-full group-hover:translate-y-0 transition-transform duration-200">
+                      <p className="text-white text-xs font-medium truncate mb-1">
+                        {image.filename}
+                      </p>
+                      <div className="flex items-center justify-between text-white text-xs">
+                        <span>{formatFileSize(image.size)}</span>
+                        <span>{formatDate(image.modified_time)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

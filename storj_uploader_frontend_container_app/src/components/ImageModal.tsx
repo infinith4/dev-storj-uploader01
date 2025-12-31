@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Download, ZoomIn, ZoomOut } from 'lucide-react';
 import { StorjImageItem } from '../types';
 import { StorjUploaderAPI } from '../api';
+import { resolveIsVideo } from '../utils/media';
 
 interface ImageModalProps {
   image: StorjImageItem;
@@ -33,7 +34,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const isVideo = Boolean(image.is_video);
+  const isVideo = resolveIsVideo(image);
   const imageUrl = StorjUploaderAPI.getStorjImageUrl(image.path);
   const posterUrl = image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path);
 
