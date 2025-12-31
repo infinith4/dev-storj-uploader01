@@ -1,6 +1,16 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 // API Constants
 class ApiConstants {
-  static const String defaultBaseUrl = 'http://localhost:8010';
+  // Get API base URL from environment variables with fallback
+  static String get defaultBaseUrl {
+    final envUrl = dotenv.env['API_BASE_URL'];
+    if (envUrl != null && envUrl.isNotEmpty) {
+      return envUrl;
+    }
+    // Fallback to localhost for development
+    return 'http://localhost:8010';
+  }
 
   // Endpoints
   static const String healthEndpoint = '/health';

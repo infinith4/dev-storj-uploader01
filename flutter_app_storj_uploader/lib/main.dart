@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/api_service.dart';
 import 'screens/home_screen.dart';
 import 'utils/constants.dart';
 
-void main() {
+Future<void> main() async {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  try {
+    await dotenv.load(fileName: '.env');
+    debugPrint('✅ Environment variables loaded successfully');
+    debugPrint('📡 API Base URL: ${ApiConstants.defaultBaseUrl}');
+  } catch (e) {
+    debugPrint('⚠️ Warning: Could not load .env file: $e');
+    debugPrint('📡 Using fallback API Base URL: ${ApiConstants.defaultBaseUrl}');
+  }
+
   // Initialize API service
   ApiService().initialize();
 

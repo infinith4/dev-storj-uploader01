@@ -10,6 +10,7 @@ import '../utils/constants.dart';
 import '../services/api_service.dart';
 import '../services/file_service.dart';
 import '../models/api_models.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -141,8 +142,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: Navigate to settings
+            onPressed: () async {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+              // If settings were changed, refresh connection
+              if (result == true && mounted) {
+                await _refreshStatus();
+              }
             },
             tooltip: 'Settings',
           ),

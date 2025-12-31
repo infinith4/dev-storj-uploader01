@@ -42,10 +42,54 @@ docker-compose up --build
 
 ## Configuration
 
-The app connects to the backend API at `http://localhost:8010` by default. This can be configured in:
+### Environment Variables
 
-- `lib/utils/constants.dart` - API base URL
-- `nginx.conf` - Proxy configuration for production
+The app uses environment variables for configuration. Copy `.env.example` to `.env` and configure:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` to set the API base URL:
+
+```env
+# Local development
+API_BASE_URL=http://localhost:8010
+
+# Azure Container Apps (Production)
+API_BASE_URL=https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io
+```
+
+### Azure Environment Connection
+
+To connect to the Azure production environment:
+
+1. **Option 1: Use .env file** (Recommended for development)
+   ```bash
+   # Edit .env file
+   API_BASE_URL=https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io
+
+   # Run the app
+   flutter run -d chrome
+   ```
+
+2. **Option 2: Use Settings Screen** (Runtime configuration)
+   - Launch the app
+   - Tap the Settings icon (⚙️) in the app bar
+   - Under "Quick Presets", select "Azure Production"
+   - Tap "Test Connection" to verify
+   - Tap "Save Settings"
+
+3. **Option 3: Edit constants.dart** (Not recommended)
+   - Modify `lib/utils/constants.dart`
+   - Change the default URL (will be overridden by .env)
+
+### Configuration Files
+
+- `.env` - Environment variables (not committed to git)
+- `.env.example` - Template for environment variables
+- `lib/utils/constants.dart` - App constants and API endpoints
+- `nginx.conf` - Nginx proxy configuration for production
 
 ## File Support
 
@@ -132,3 +176,95 @@ The app integrates with the following backend endpoints:
 - Batch uploading with configurable limits
 - Caching of API responses
 - Optimized nginx configuration with gzip compression
+
+## Troubleshooting
+
+### Web Version Drag & Drop Issues
+
+If you encounter errors when using drag & drop in the web version (`flutter run -d web-server`):
+
+**Problem**: `flutter_dropzone` package has compatibility issues with some Flutter web server configurations.
+
+**Solution**: Use the file picker button instead:
+
+1. Click the "Select Files" button instead of dragging files
+2. This uses the `file_picker` package which has better web compatibility
+
+**Alternative**: If you need drag & drop functionality:
+
+1. Build and run with production configuration:
+   ```bash
+   flutter build web --release
+   cd build/web
+   python3 -m http.server 8080
+   ```
+
+2. Or use Chrome browser directly:
+   ```bash
+   flutter run -d chrome
+   ```
+
+### API Connection Issues
+
+If the app cannot connect to the backend:
+
+1. **Check API URL**: Go to Settings → verify API Base URL
+2. **Test Connection**: Tap "Test Connection" button in Settings
+3. **Check Backend**: Ensure backend API is running:
+   ```bash
+   curl https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io/health
+   ```
+4. **CORS Issues**: If running locally, ensure backend allows CORS from your origin
+
+### Environment Variable Not Loading
+
+If `.env` file is not loading:
+
+1. Ensure `.env` file is in the project root (`flutter_app_storj_uploader/.env`)
+2. Check that `.env` is listed in `pubspec.yaml` under `assets:`
+3. Run `flutter pub get` after modifying `pubspec.yaml`
+4. Clean and rebuild:
+   ```bash
+   flutter clean
+   flutter pub get
+   flutter build web
+   ```
+
+## Azure Container Apps Deployment
+
+To deploy the Flutter app to Azure Container Apps:
+
+### Prerequisites
+
+- Azure CLI installed and logged in
+- ACR (Azure Container Registry) access
+- `.env` file configured with Azure backend URL
+
+### Build and Push Docker Image
+
+```bash
+# Login to Azure Container Registry
+az acr login --name stjup2acrudm3tutq7eb7i
+
+# Build the Docker image
+docker build -t stjup2acrudm3tutq7eb7i.azurecr.io/storj-flutter:latest .
+
+# Push to ACR
+docker push stjup2acrudm3tutq7eb7i.azurecr.io/storj-flutter:latest
+```
+
+### Deploy to Container Apps
+
+The Flutter app can be deployed as a separate Container App or served from the frontend container. See `AZURE_ENV.md` for deployment details.
+
+### Environment Configuration for Azure
+
+When deploying to Azure, ensure the `.env` file is built into the image with the Azure backend URL:
+
+```dockerfile
+# In Dockerfile, before building
+COPY .env .env
+RUN flutter build web --release
+```
+
+Or set the API URL at runtime using environment variables in the Container App configuration.
