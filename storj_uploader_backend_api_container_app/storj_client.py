@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import subprocess
 import os
+import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Iterator
 import threading
 import time
 from datetime import datetime
@@ -387,8 +388,9 @@ class StorjClient:
                         # Use the thumbnail file
                         thumbnail_url = f"{api_base_url}/storj/images/{thumbnail_path}?thumbnail=false"
                     else:
-                        # No thumbnail found, use the video itself
-                        thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
+                        # No thumbnail found, fall back to expected _thumb file
+                        fallback_thumb = f"{path.rsplit('.', 1)[0]}_thumb.jpg"
+                        thumbnail_url = f"{api_base_url}/storj/images/{fallback_thumb}?thumbnail=false"
                 else:
                     # For images, use the standard thumbnail parameter
                     thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
@@ -464,6 +466,115 @@ class StorjClient:
             except Exception as e:
                 print(f"Error fetching Storj image: {str(e)}")
                 return False, b"", str(e)
+
+    def get_storj_object_info(self, object_path: str, bucket_name: str = None) -> Tuple[bool, dict, str]:
+        """
+        Storjオブジェクトのメタ情報を取得 (サイズなど)
+        Returns: (success: bool, info: dict, error_message: str)
+        """
+        try:
+            if bucket_name is None:
+                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+            env, error_message = self._get_rclone_env()
+            if error_message:
+                return False, {}, error_message
+
+            remote_path = f"{remote_name}:{bucket_name}/{object_path}"
+            cmd = [
+                "rclone", "lsjson",
+                "--stat",
+                remote_path
+            ]
+
+            result = subprocess.run(
+                cmd,
+                cwd=str(self.storj_app_path),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Unknown error"
+                print(f"rclone lsjson failed: {error_msg}")
+                return False, {}, error_msg
+
+            info = json.loads(result.stdout)
+            if not isinstance(info, dict):
+                return False, {}, "Invalid lsjson response"
+
+            return True, info, "Success"
+
+        except subprocess.TimeoutExpired:
+            return False, {}, "rclone command timed out"
+        except Exception as e:
+            print(f"Error fetching Storj object info: {str(e)}")
+            return False, {}, str(e)
+
+    def stream_storj_file(
+        self,
+        object_path: str,
+        bucket_name: str = None,
+        offset: int = None,
+        count: int = None
+    ) -> Tuple[bool, Iterator[bytes], str]:
+        """
+        Storjのファイルをストリームで取得
+        Returns: (success: bool, iterator: Iterator[bytes], error_message: str)
+        """
+        try:
+            if bucket_name is None:
+                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+            env, error_message = self._get_rclone_env()
+            if error_message:
+                return False, iter(()), error_message
+
+            remote_path = f"{remote_name}:{bucket_name}/{object_path}"
+            cmd = [
+                "rclone", "cat",
+                remote_path
+            ]
+            if offset is not None:
+                cmd.extend(["--offset", str(offset)])
+            if count is not None:
+                cmd.extend(["--count", str(count)])
+
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(self.storj_app_path),
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            def iterator() -> Iterator[bytes]:
+                try:
+                    if not proc.stdout:
+                        return
+                    for chunk in iter(lambda: proc.stdout.read(1024 * 1024), b""):
+                        yield chunk
+                finally:
+                    if proc.stdout:
+                        proc.stdout.close()
+                    stderr = None
+                    if proc.stderr:
+                        stderr = proc.stderr.read()
+                        proc.stderr.close()
+                    return_code = proc.wait()
+                    if return_code != 0:
+                        error_detail = stderr.decode("utf-8", errors="ignore") if stderr else ""
+                        print(f"rclone cat failed: {error_detail or return_code}")
+
+            return True, iterator(), "Success"
+
+        except Exception as e:
+            print(f"Error streaming Storj file: {str(e)}")
+            return False, iter(()), str(e)
 
     def get_storj_thumbnail(self, image_path: str, bucket_name: str = None, size: tuple = (300, 300)) -> Tuple[bool, bytes, str]:
         """

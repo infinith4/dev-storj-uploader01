@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { RefreshCw, AlertCircle, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import { StorjImageItem } from '../types';
 import { StorjUploaderAPI } from '../api';
 import ImageModal from './ImageModal';
@@ -154,11 +154,18 @@ const ImageGallery: React.FC = () => {
               >
                 {/* サムネイル画像 */}
                 <img
-                  src={StorjUploaderAPI.getStorjThumbnailUrl(image.path)}
+                  src={image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path)}
                   alt={image.filename}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
+
+                {image.is_video && (
+                  <div className="absolute top-2 left-2 flex items-center px-2 py-1 rounded bg-black bg-opacity-60 text-white text-xs">
+                    <VideoIcon className="w-3 h-3 mr-1" />
+                    動画
+                  </div>
+                )}
 
                 {/* ホバー時のオーバーレイ */}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-end p-2">

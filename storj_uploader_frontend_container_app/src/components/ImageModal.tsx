@@ -33,7 +33,9 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
+  const isVideo = Boolean(image.is_video);
   const imageUrl = StorjUploaderAPI.getStorjImageUrl(image.path);
+  const posterUrl = image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path);
 
   const handleDownload = () => {
     const link = document.createElement('a');
@@ -94,20 +96,24 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <button
-                onClick={handleZoomOut}
-                className="p-2 rounded-full bg-gray-800 bg-opacity-50 hover:bg-opacity-75 transition-all"
-                title="ズームアウト"
-              >
-                <ZoomOut className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleZoomIn}
-                className="p-2 rounded-full bg-gray-800 bg-opacity-50 hover:bg-opacity-75 transition-all"
-                title="ズームイン"
-              >
-                <ZoomIn className="w-5 h-5" />
-              </button>
+              {!isVideo && (
+                <>
+                  <button
+                    onClick={handleZoomOut}
+                    className="p-2 rounded-full bg-gray-800 bg-opacity-50 hover:bg-opacity-75 transition-all"
+                    title="ズームアウト"
+                  >
+                    <ZoomOut className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={handleZoomIn}
+                    className="p-2 rounded-full bg-gray-800 bg-opacity-50 hover:bg-opacity-75 transition-all"
+                    title="ズームイン"
+                  >
+                    <ZoomIn className="w-5 h-5" />
+                  </button>
+                </>
+              )}
               <button
                 onClick={handleDownload}
                 className="p-2 rounded-full bg-gray-800 bg-opacity-50 hover:bg-opacity-75 transition-all"
@@ -136,32 +142,53 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
           )}
           {error && (
             <div className="text-white text-center">
-              <p className="text-red-400 mb-2">画像の読み込みに失敗しました</p>
+              <p className="text-red-400 mb-2">
+                {isVideo ? '動画' : '画像'}の読み込みに失敗しました
+              </p>
               <p className="text-sm text-gray-400">{error}</p>
             </div>
           )}
-          <img
-            src={imageUrl}
-            alt={image.filename}
-            className="max-w-full max-h-full object-contain transition-transform duration-200"
-            style={{
-              transform: `scale(${zoom})`,
-              display: isLoading || error ? 'none' : 'block',
-            }}
-            onLoad={() => setIsLoading(false)}
-            onError={() => {
-              setIsLoading(false);
-              setError('画像の読み込みに失敗しました');
-            }}
-          />
+          {isVideo ? (
+            <video
+              src={imageUrl}
+              poster={posterUrl}
+              controls
+              preload="metadata"
+              playsInline
+              className="max-w-full max-h-full"
+              style={{ display: isLoading || error ? 'none' : 'block' }}
+              onLoadedData={() => setIsLoading(false)}
+              onError={() => {
+                setIsLoading(false);
+                setError('動画の読み込みに失敗しました');
+              }}
+            />
+          ) : (
+            <img
+              src={imageUrl}
+              alt={image.filename}
+              className="max-w-full max-h-full object-contain transition-transform duration-200"
+              style={{
+                transform: `scale(${zoom})`,
+                display: isLoading || error ? 'none' : 'block',
+              }}
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setIsLoading(false);
+                setError('画像の読み込みに失敗しました');
+              }}
+            />
+          )}
         </div>
 
         {/* フッター（ズーム表示） */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black to-transparent p-4">
-          <div className="text-center text-white text-sm">
-            ズーム: {Math.round(zoom * 100)}%
+        {!isVideo && (
+          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black to-transparent p-4">
+            <div className="text-center text-white text-sm">
+              ズーム: {Math.round(zoom * 100)}%
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

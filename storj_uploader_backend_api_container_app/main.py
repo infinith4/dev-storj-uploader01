@@ -5,8 +5,8 @@ Storj Uploader Backend API
 FastAPI + OpenAPI v3対応のファイルアップロードAPI
 HEICやJPEGなどの画像ファイル、動画ファイル、その他すべてのファイル形式に対応
 """
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, Response
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
@@ -26,6 +26,66 @@ from models import (
     ErrorResponse, FileUploadResult, FileInfo, FileStatus,
     StorjImageListResponse, StorjImageItem
 )
+
+VIDEO_MIME_TYPES = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+    ".m4v": "video/x-m4v",
+    ".3gp": "video/3gpp",
+    ".flv": "video/x-flv",
+    ".wmv": "video/x-ms-wmv"
+}
+
+
+def _parse_range_header(range_header: str, file_size: int):
+    if not range_header or not range_header.startswith("bytes="):
+        return None
+
+    range_spec = range_header.replace("bytes=", "", 1).strip()
+    if "," in range_spec:
+        range_spec = range_spec.split(",", 1)[0].strip()
+
+    if range_spec.startswith("-"):
+        try:
+            suffix_length = int(range_spec[1:])
+        except ValueError:
+            return None
+        if suffix_length <= 0:
+            return None
+        start = max(file_size - suffix_length, 0)
+        end = file_size - 1
+        return start, end
+
+    start_str, _, end_str = range_spec.partition("-")
+    try:
+        start = int(start_str)
+    except ValueError:
+        return None
+
+    if start >= file_size:
+        return None
+
+    if end_str:
+        try:
+            end = int(end_str)
+        except ValueError:
+            return None
+        end = min(end, file_size - 1)
+    else:
+        end = file_size - 1
+
+    if end < start:
+        return None
+
+    return start, end
+
+
+def _get_video_content_type(filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    return VIDEO_MIME_TYPES.get(ext, "application/octet-stream")
 
 try:
     from blob_storage import BlobStorageHelper
@@ -773,7 +833,8 @@ async def get_storj_images(
 async def get_storj_image(
     image_path: str,
     thumbnail: bool = True,
-    bucket: str = None
+    bucket: str = None,
+    request: Request = None
 ):
     """
     Storjから画像を取得して配信
@@ -786,13 +847,71 @@ async def get_storj_image(
     print(f"====================")
 
     try:
+        is_video = VideoProcessor.is_video_file(image_path)
+
+        if is_video and not thumbnail:
+            info_success, info, info_error = storj_client.get_storj_object_info(
+                object_path=image_path,
+                bucket_name=bucket
+            )
+            if not info_success:
+                raise HTTPException(status_code=404, detail=info_error)
+
+            file_size = info.get("Size") or info.get("size")
+            if not isinstance(file_size, int) or file_size <= 0:
+                raise HTTPException(status_code=500, detail="Invalid file size")
+
+            range_header = request.headers.get("range") if request else None
+            range_tuple = _parse_range_header(range_header, file_size) if range_header else None
+            if range_header and not range_tuple:
+                return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+            if range_tuple:
+                start, end = range_tuple
+                content_length = end - start + 1
+                status_code = 206
+            else:
+                start, end = 0, file_size - 1
+                content_length = file_size
+                status_code = 200
+
+            stream_success, stream_iter, stream_error = storj_client.stream_storj_file(
+                object_path=image_path,
+                bucket_name=bucket,
+                offset=start if range_tuple else None,
+                count=content_length if range_tuple else None
+            )
+            if not stream_success:
+                raise HTTPException(status_code=500, detail=stream_error)
+
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length)
+            }
+            if range_tuple:
+                headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+
+            return StreamingResponse(
+                stream_iter,
+                media_type=_get_video_content_type(image_path),
+                headers=headers,
+                status_code=status_code
+            )
+
         # サムネイルまたはフルサイズ画像を取得
         if thumbnail:
-            success, image_data, error_msg = storj_client.get_storj_thumbnail(
-                image_path=image_path,
-                bucket_name=bucket,
-                size=(300, 300)
-            )
+            if is_video:
+                thumbnail_path = f"{Path(image_path).with_suffix('')}_thumb.jpg"
+                success, image_data, error_msg = storj_client.get_storj_image(
+                    image_path=thumbnail_path,
+                    bucket_name=bucket
+                )
+            else:
+                success, image_data, error_msg = storj_client.get_storj_thumbnail(
+                    image_path=image_path,
+                    bucket_name=bucket,
+                    size=(300, 300)
+                )
         else:
             success, image_data, error_msg = storj_client.get_storj_image(
                 image_path=image_path,
