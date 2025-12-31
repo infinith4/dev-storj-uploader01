@@ -388,9 +388,8 @@ class StorjClient:
                         # Use the thumbnail file
                         thumbnail_url = f"{api_base_url}/storj/images/{thumbnail_path}?thumbnail=false"
                     else:
-                        # No thumbnail found, fall back to expected _thumb file
-                        fallback_thumb = f"{path.rsplit('.', 1)[0]}_thumb.jpg"
-                        thumbnail_url = f"{api_base_url}/storj/images/{fallback_thumb}?thumbnail=false"
+                        # No thumbnail found, let the API generate on-demand
+                        thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
                 else:
                     # For images, use the standard thumbnail parameter
                     thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
