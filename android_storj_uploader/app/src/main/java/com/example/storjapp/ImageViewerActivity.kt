@@ -3,6 +3,7 @@ package com.example.storjapp
 import android.Manifest
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -113,6 +114,14 @@ class ImageViewerActivity : AppCompatActivity() {
     }
 
     private fun loadImage() {
+        // Check if this is a video file - if so, redirect to VideoPlayerActivity
+        val filePathToCheck = imagePath ?: imageUri?.toString()
+        if (filePathToCheck != null && isVideoFile(filePathToCheck)) {
+            Log.d(TAG, "Detected video file, redirecting to VideoPlayerActivity: $filePathToCheck")
+            redirectToVideoPlayer()
+            return
+        }
+
         // Determine image source: local URI or Storj URL
         val imageSource: Any = when {
             imageUri != null -> {
@@ -167,6 +176,25 @@ class ImageViewerActivity : AppCompatActivity() {
                 }
             })
             .into(photoView)
+    }
+
+    private fun isVideoFile(filePath: String): Boolean {
+        val videoExtensions = listOf(".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".3gp", ".flv", ".wmv")
+        val lowerPath = filePath.lowercase()
+        return videoExtensions.any { lowerPath.endsWith(it) }
+    }
+
+    private fun redirectToVideoPlayer() {
+        val intent = Intent(this, VideoPlayerActivity::class.java).apply {
+            if (imagePath != null) {
+                putExtra(VideoPlayerActivity.EXTRA_VIDEO_PATH, imagePath)
+            } else if (imageUri != null) {
+                putExtra(VideoPlayerActivity.EXTRA_VIDEO_PATH, imageUri.toString())
+            }
+            putExtra(VideoPlayerActivity.EXTRA_VIDEO_FILENAME, filename ?: "動画")
+        }
+        startActivity(intent)
+        finish() // Close ImageViewerActivity
     }
 
     private fun showError(message: String) {
