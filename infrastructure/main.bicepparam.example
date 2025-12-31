@@ -7,6 +7,7 @@ param location = 'japaneast'
 // ACR に push 後は '<your-acr-name>.azurecr.io/...' に置き換えてください
 param backendContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
 param frontendContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
+param flutterContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
 param storjContainerImage = 'mcr.microsoft.com/mcr/hello-world:latest'
 
 // ACR 認証情報 (初回デプロイは空でOK)

@@ -12,6 +12,9 @@ param backendContainerImage string
 @description('Frontend container image')
 param frontendContainerImage string
 
+@description('Flutter web container image')
+param flutterContainerImage string
+
 @description('Storj Uploader container image')
 param storjContainerImage string
 
@@ -89,6 +92,7 @@ var storageAccountName = '${baseName}st${uniqueSuffix}'
 var acrName = toLower(replace('${baseName}acr${uniqueSuffix}', '-', ''))
 var backendAppName = '${baseName}-backend-${uniqueSuffix}'
 var frontendAppName = '${baseName}-frontend-${uniqueSuffix}'
+var flutterAppName = '${baseName}-flutter-${uniqueSuffix}'
 var storjAppName = '${baseName}-storj-${uniqueSuffix}'
 var keyVaultName = '${baseName}-kv-${uniqueSuffix}'
 
@@ -293,6 +297,27 @@ module frontend 'modules/frontend.bicep' = {
   }
 }
 
+// Flutter Web Container App
+module flutterWeb 'modules/flutter-web.bicep' = {
+  name: 'flutterWeb'
+  params: {
+    containerAppName: flutterAppName
+    location: location
+    environmentId: environment.outputs.environmentId
+    containerImage: flutterContainerImage
+    enableManagedIdentity: enableManagedIdentity
+    containerRegistryServer: resolvedRegistryServer
+    containerRegistryUsername: resolvedRegistryUsername
+    containerRegistryPassword: resolvedRegistryPassword
+    enableAadAuth: enableAadAuth
+    aadTenantId: aadTenantId
+    aadClientId: aadClientId
+    aadClientSecret: aadClientSecret
+    aadOpenIdIssuer: aadOpenIdIssuer
+    aadAllowedAudiences: aadAllowedAudiences
+  }
+}
+
 // Grant Contributor role to Service Principal for Container Apps management
 // Note: ロール割り当てが既に存在する場合はスキップされます
 resource contributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(contributorPrincipalId)) {
@@ -308,6 +333,7 @@ resource contributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
 // Outputs
 output backendApiUrl string = 'https://${backendApi.outputs.fqdn}'
 output frontendUrl string = 'https://${frontend.outputs.fqdn}'
+output flutterUrl string = 'https://${flutterWeb.outputs.fqdn}'
 output storageAccountName string = storage.outputs.storageAccountName
 output environmentName string = environment.outputs.environmentName
 output resourceGroupName string = resourceGroup().name
