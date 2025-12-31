@@ -251,6 +251,9 @@ google-services.json
 # Plugins (already resolved through pubspec.yaml)
 .flutter-plugins
 
+# Environment variables
+.env
+
 
 # Miscellaneous
 *.class
