@@ -43,6 +43,25 @@ param contributorPrincipalId string = ''
 @description('Enable system-assigned managed identity for Container Apps')
 param enableManagedIdentity bool = false
 
+@description('Enable Azure AD EasyAuth for the frontend')
+param enableAadAuth bool = false
+
+@description('Azure AD tenant ID')
+param aadTenantId string = ''
+
+@description('Azure AD application (client) ID')
+param aadClientId string = ''
+
+@description('Azure AD client secret')
+@secure()
+param aadClientSecret string = ''
+
+@description('Azure AD OpenID issuer (v1: https://sts.windows.net/<tenant-id>/, v2: https://login.microsoftonline.com/<tenant-id>/v2.0)')
+param aadOpenIdIssuer string = ''
+
+@description('Allowed audiences for AAD tokens (defaults to client ID)')
+param aadAllowedAudiences array = []
+
 @description('Storj Bucket Name')
 param storjBucketName string
 
@@ -265,6 +284,12 @@ module frontend 'modules/frontend.bicep' = {
     containerRegistryUsername: resolvedRegistryUsername
     containerRegistryPassword: resolvedRegistryPassword
     backendApiUrl: 'https://${backendApi.outputs.fqdn}'
+    enableAadAuth: enableAadAuth
+    aadTenantId: aadTenantId
+    aadClientId: aadClientId
+    aadClientSecret: aadClientSecret
+    aadOpenIdIssuer: aadOpenIdIssuer
+    aadAllowedAudiences: aadAllowedAudiences
   }
 }
 

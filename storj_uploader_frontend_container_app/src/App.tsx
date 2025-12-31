@@ -68,7 +68,7 @@ const App: React.FC = () => {
             title="動画アップロード"
             description="MP4、MOV、AVI等の動画ファイルをStorjにアップロードします"
             acceptedTypes={['video']}
-            maxFiles={10}
+            maxFiles={100}
           />
         );
       case 'files':
