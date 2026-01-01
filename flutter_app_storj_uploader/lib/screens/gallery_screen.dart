@@ -23,7 +23,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   String? _errorMessage;
   final ScrollController _scrollController = ScrollController();
   int _currentOffset = 0;
-  static const int _pageSize = 50;
+  static const int _pageSize = 20;
   bool _hasMore = true;
   bool _isLoadingMore = false;
   GallerySortOption _sortOption = GallerySortOption.capturedDate;
