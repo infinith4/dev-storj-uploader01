@@ -16,6 +16,12 @@ RUN flutter pub get
 # Copy source code
 COPY --chown=flutter:flutter . .
 
+# Ensure asset directories and env file exist for web build
+RUN mkdir -p assets/images assets/icons && \
+    if [ ! -f .env ]; then \
+      if [ -f .env.example ]; then cp .env.example .env; else touch .env; fi; \
+    fi
+
 # Enable web platform and build
 RUN flutter config --enable-web && \
     flutter create . --platforms web && \
