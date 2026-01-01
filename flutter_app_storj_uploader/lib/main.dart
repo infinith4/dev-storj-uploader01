@@ -102,7 +102,9 @@ class StorjUploaderApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const SelectionArea(
+        child: HomeScreen(),
+      ),
     );
   }
 }

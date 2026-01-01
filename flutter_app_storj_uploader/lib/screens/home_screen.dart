@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/file_service.dart';
 import '../models/api_models.dart';
 import 'settings_screen.dart';
+import 'gallery_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _checkConnection();
     _loadSystemStatus();
   }
@@ -58,10 +59,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _loadSystemStatus() async {
-    if (!_isConnected) return;
+    if (!_isConnected) {
+      print('DEBUG _loadSystemStatus: Not connected, skipping');
+      return;
+    }
 
     try {
+      print('DEBUG _loadSystemStatus: Fetching status...');
       final status = await ApiService().getStatus();
+      print('DEBUG _loadSystemStatus: Got status - storjServiceRunning: ${status.storjServiceRunning}');
+      print('DEBUG _loadSystemStatus: uploadQueueCount: ${status.uploadQueueCount}, totalUploaded: ${status.totalUploaded}');
       if (mounted) {
         setState(() {
           _systemStatus = status;
@@ -162,6 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             Tab(icon: Icon(Icons.upload), text: 'Upload'),
             Tab(icon: Icon(Icons.queue), text: 'Queue'),
             Tab(icon: Icon(Icons.info), text: 'Status'),
+            Tab(icon: Icon(Icons.photo_library), text: 'Gallery'),
           ],
         ),
       ),
@@ -186,6 +194,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                 // Status Tab
                 _buildStatusTab(),
+
+                // Gallery Tab
+                const GalleryScreen(),
               ],
             ),
           ),

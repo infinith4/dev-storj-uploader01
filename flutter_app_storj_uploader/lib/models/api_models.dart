@@ -307,6 +307,83 @@ enum FileUploadStatus {
   failed,
 }
 
+// Storj Image/Video Item Model
+class StorjImageItem {
+  final String filename;
+  final String path;
+  final int size;
+  final String modifiedTime;
+  final String thumbnailUrl;
+  final String url;
+  final bool isVideo;
+
+  StorjImageItem({
+    required this.filename,
+    required this.path,
+    required this.size,
+    required this.modifiedTime,
+    required this.thumbnailUrl,
+    required this.url,
+    required this.isVideo,
+  });
+
+  factory StorjImageItem.fromJson(Map<String, dynamic> json) {
+    return StorjImageItem(
+      filename: json['filename'] ?? '',
+      path: json['path'] ?? '',
+      size: json['size'] ?? 0,
+      modifiedTime: json['modified_time'] ?? '',
+      thumbnailUrl: json['thumbnail_url'] ?? '',
+      url: json['url'] ?? '',
+      isVideo: json['is_video'] ?? false,
+    );
+  }
+
+  // Helper to get formatted size
+  String get formattedSize {
+    if (size < 1024) return '$size B';
+    if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
+    if (size < 1024 * 1024 * 1024) return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  // Helper to get formatted date
+  String get formattedDate {
+    try {
+      final date = DateTime.parse(modifiedTime);
+      return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return modifiedTime;
+    }
+  }
+}
+
+// Storj Image List Response
+class StorjImageListResponse {
+  final List<StorjImageItem> images;
+  final int total;
+  final int limit;
+  final int offset;
+
+  StorjImageListResponse({
+    required this.images,
+    required this.total,
+    required this.limit,
+    required this.offset,
+  });
+
+  factory StorjImageListResponse.fromJson(Map<String, dynamic> json) {
+    return StorjImageListResponse(
+      images: (json['images'] as List<dynamic>?)
+          ?.map((item) => StorjImageItem.fromJson(item as Map<String, dynamic>))
+          .toList() ?? [],
+      total: json['total'] ?? 0,
+      limit: json['limit'] ?? 100,
+      offset: json['offset'] ?? 0,
+    );
+  }
+}
+
 // Upload Progress Model
 class UploadProgress {
   final String fileId;
