@@ -130,14 +130,16 @@ class _ConnectionStatusState extends State<ConnectionStatus>
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    Text(
-                      ApiConstants.defaultBaseUrl,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 10,
+                    SelectionArea(
+                      child: Text(
+                        ApiConstants.defaultBaseUrl,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -205,14 +207,16 @@ class _ConnectionStatusState extends State<ConnectionStatus>
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            Text(
-                              'Trying to connect to: ${ApiConstants.defaultBaseUrl}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 10,
+                            SelectionArea(
+                              child: Text(
+                                'Trying to connect to: ${ApiConstants.defaultBaseUrl}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 10,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -300,11 +304,13 @@ class _ConnectionStatusState extends State<ConnectionStatus>
           ),
           const SizedBox(width: UIConstants.smallPadding),
           Expanded(
-            child: Text(
-              'Make sure the backend server is running on localhost:8010',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 11,
+            child: SelectionArea(
+              child: Text(
+                'Make sure the backend server is running on localhost:8010',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 11,
+                ),
               ),
             ),
           ),
