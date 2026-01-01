@@ -691,6 +691,67 @@ class StorjClient:
                 print(f"Error fetching Storj image: {str(e)}")
                 return False, b"", str(e)
 
+    def download_storj_file_to_path(
+        self,
+        object_path: str,
+        dest_path: Path,
+        bucket_name: str = None,
+        timeout: int = 300
+    ) -> Tuple[bool, str]:
+        """
+        Storjファイルをローカルパスへダウンロード（メモリ使用を抑える）
+        Returns: (success: bool, error_message: str)
+        """
+        try:
+            if bucket_name is None:
+                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+            env, error_message = self._get_rclone_env()
+            if error_message:
+                return False, error_message
+
+            remote_path = f"{remote_name}:{bucket_name}/{object_path}"
+            cmd = [
+                "rclone", "cat",
+                remote_path
+            ]
+
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest_path, "wb") as outfile:
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(self.storj_app_path),
+                    env=env,
+                    stdout=outfile,
+                    stderr=subprocess.PIPE,
+                    timeout=timeout
+                )
+
+            if result.returncode != 0:
+                error_msg = result.stderr.decode("utf-8", errors="ignore") if result.stderr else "Unknown error"
+                print(f"rclone cat failed: {error_msg}")
+                if dest_path.exists():
+                    dest_path.unlink()
+                return False, error_msg
+
+            if not dest_path.exists() or dest_path.stat().st_size == 0:
+                if dest_path.exists():
+                    dest_path.unlink()
+                return False, "Downloaded file is empty"
+
+            return True, "Success"
+
+        except subprocess.TimeoutExpired:
+            if dest_path.exists():
+                dest_path.unlink()
+            return False, "rclone command timed out"
+        except Exception as e:
+            print(f"Error downloading Storj file: {str(e)}")
+            if dest_path.exists():
+                dest_path.unlink()
+            return False, str(e)
+
     def get_storj_object_info(self, object_path: str, bucket_name: str = None) -> Tuple[bool, dict, str]:
         """
         Storjオブジェクトのメタ情報を取得 (サイズなど)
