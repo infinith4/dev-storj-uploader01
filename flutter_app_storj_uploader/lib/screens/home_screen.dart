@@ -395,35 +395,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         for (final localFile in batch) {
           try {
-            // Web platform doesn't support File I/O in the same way
+            // Web platform uses byte data instead of File I/O
             if (kIsWeb) {
-              // For web, we would need to implement a different upload mechanism
-              // This is a placeholder - actual implementation would depend on
-              // how files are handled in the web version
-              _showSnackBar('Web upload not yet implemented for ${localFile.name}');
-              failCount++;
-              continue;
-            }
+              // For web, use bytes stored in LocalFile
+              if (localFile.bytes == null) {
+                throw Exception('File data not available for web upload: ${localFile.name}');
+              }
 
-            final file = File(localFile.path);
-
-            // Validate file still exists (only for non-web platforms)
-            if (!await file.exists()) {
-              throw Exception('File not found: ${localFile.name}');
-            }
-
-            // Determine upload method based on file type
-            final isImage = FileTypeUtils.isImageFile(
-              localFile.name.split('.').last.toLowerCase()
-            );
-
-            if (isImage) {
-              await ApiService().uploadSingleImage(file);
+              print('Uploading file from bytes: ${localFile.name}');
+              await ApiService().uploadFromBytes(
+                localFile.bytes!,
+                localFile.name,
+              );
+              successCount++;
             } else {
-              await ApiService().uploadSingleFile(file);
-            }
+              // For non-web platforms, use file path
+              final file = File(localFile.path);
 
-            successCount++;
+              // Validate file still exists
+              if (!await file.exists()) {
+                throw Exception('File not found: ${localFile.name}');
+              }
+
+              // Determine upload method based on file type
+              final isImage = FileTypeUtils.isImageFile(
+                localFile.name.split('.').last.toLowerCase()
+              );
+
+              print('Uploading file from path: ${localFile.name}');
+              if (isImage) {
+                await ApiService().uploadSingleImage(file);
+              } else {
+                await ApiService().uploadSingleFile(file);
+              }
+              successCount++;
+            }
           } catch (e) {
             print('Failed to upload ${localFile.name}: $e');
             failCount++;

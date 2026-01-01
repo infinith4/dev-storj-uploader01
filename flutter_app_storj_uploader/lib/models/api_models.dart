@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 // API Response Models
 class UploadResponse {
   final String message;
@@ -167,6 +169,7 @@ class LocalFile {
   final String? thumbnailPath;
   final FileUploadStatus uploadStatus;
   final String? errorMessage;
+  final Uint8List? bytes; // For web platform - stores file data in memory
 
   LocalFile({
     required this.id,
@@ -178,6 +181,7 @@ class LocalFile {
     this.thumbnailPath,
     this.uploadStatus = FileUploadStatus.pending,
     this.errorMessage,
+    this.bytes,
   });
 
   LocalFile copyWith({
@@ -190,6 +194,7 @@ class LocalFile {
     String? thumbnailPath,
     FileUploadStatus? uploadStatus,
     String? errorMessage,
+    Uint8List? bytes,
   }) {
     return LocalFile(
       id: id ?? this.id,
@@ -201,6 +206,7 @@ class LocalFile {
       thumbnailPath: thumbnailPath ?? this.thumbnailPath,
       uploadStatus: uploadStatus ?? this.uploadStatus,
       errorMessage: errorMessage ?? this.errorMessage,
+      bytes: bytes ?? this.bytes,
     );
   }
 }

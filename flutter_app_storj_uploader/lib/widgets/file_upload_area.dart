@@ -158,7 +158,13 @@ class _FileUploadAreaState extends State<FileUploadArea>
   }
 
   Future<void> _onDrop(dynamic event) async {
-    if (!widget.isEnabled || _dropzoneController == null) return;
+    if (!widget.isEnabled) return;
+
+    if (_dropzoneController == null) {
+      print('ERROR: _dropzoneController is null in _onDrop');
+      _showErrorSnackBar('File upload controller not initialized');
+      return;
+    }
 
     setState(() {
       _isDragOver = false;
@@ -185,10 +191,19 @@ class _FileUploadAreaState extends State<FileUploadArea>
       }
 
       // Get file data (bytes) - returns Uint8List
-      final Uint8List bytes = await _dropzoneController!.getFileData(event);
+      print('Getting file data for $name...');
+      final Uint8List? bytes = await _dropzoneController!.getFileData(event);
+
+      if (bytes == null) {
+        print('ERROR: getFileData returned null for file: $name');
+        _showErrorSnackBar('Failed to read file data: $name');
+        return;
+      }
+
       print('File data loaded: ${bytes.length} bytes');
 
       // Create LocalFile using FileService
+      print('Creating LocalFile from bytes...');
       final localFile = await FileService().createLocalFileFromBytes(bytes, name);
 
       if (localFile != null) {
@@ -196,6 +211,7 @@ class _FileUploadAreaState extends State<FileUploadArea>
         widget.onFilesSelected([localFile]);
         _showSuccessAnimation();
       } else {
+        print('ERROR: createLocalFileFromBytes returned null for file: $name');
         _showErrorSnackBar('Failed to process file: $name');
       }
     } catch (e, stackTrace) {
@@ -206,7 +222,13 @@ class _FileUploadAreaState extends State<FileUploadArea>
   }
 
   Future<void> _onDropMultiple(List<dynamic>? events) async {
-    if (!widget.isEnabled || _dropzoneController == null || events == null || events.isEmpty) return;
+    if (!widget.isEnabled || events == null || events.isEmpty) return;
+
+    if (_dropzoneController == null) {
+      print('ERROR: _dropzoneController is null in _onDropMultiple');
+      _showErrorSnackBar('File upload controller not initialized');
+      return;
+    }
 
     setState(() {
       _isDragOver = false;
@@ -235,15 +257,25 @@ class _FileUploadAreaState extends State<FileUploadArea>
           }
 
           // Get file data (bytes) - returns Uint8List
-          final Uint8List bytes = await _dropzoneController!.getFileData(event);
+          print('Getting file data for $name...');
+          final Uint8List? bytes = await _dropzoneController!.getFileData(event);
+
+          if (bytes == null) {
+            print('ERROR: getFileData returned null for file: $name');
+            continue;
+          }
+
           print('File data loaded for $name: ${bytes.length} bytes');
 
           // Create LocalFile using FileService
+          print('Creating LocalFile from bytes...');
           final localFile = await FileService().createLocalFileFromBytes(bytes, name);
 
           if (localFile != null) {
             print('LocalFile created: ${localFile.name}');
             localFiles.add(localFile);
+          } else {
+            print('ERROR: createLocalFileFromBytes returned null for file: $name');
           }
         } catch (e, stackTrace) {
           print('Error processing file: $e');

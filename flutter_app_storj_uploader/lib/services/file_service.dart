@@ -238,28 +238,43 @@ class FileService {
     String fileName,
   ) async {
     try {
+      print('createLocalFileFromBytes: Starting for file: $fileName, size: ${bytes.length} bytes');
       final String tempPath;
 
       if (kIsWeb) {
         // For web, create a virtual path
-        tempPath = 'web_file_${_uuid.v4()}_$fileName';
+        final uniqueId = _uuid.v4();
+        tempPath = 'web_file_${uniqueId}_$fileName';
+        print('createLocalFileFromBytes: Created web path: $tempPath');
       } else {
         // Save bytes to temporary file for non-web platforms
+        print('createLocalFileFromBytes: Getting temporary directory...');
         final Directory tempDir = await getTemporaryDirectory();
-        tempPath = '${tempDir.path}/${_uuid.v4()}_$fileName';
+        print('createLocalFileFromBytes: Temp directory: ${tempDir.path}');
+
+        final uniqueId = _uuid.v4();
+        tempPath = '${tempDir.path}/${uniqueId}_$fileName';
+        print('createLocalFileFromBytes: Temp file path: $tempPath');
+
         final File tempFile = File(tempPath);
         await tempFile.writeAsBytes(bytes);
+        print('createLocalFileFromBytes: File written successfully');
       }
 
       final String? mimeType = lookupMimeType(fileName);
+      print('createLocalFileFromBytes: MIME type: ${mimeType ?? "unknown"}');
+
       final bool isImage = FileTypeUtils.isImageFile(_getFileExtension(fileName));
+      print('createLocalFileFromBytes: Is image: $isImage');
 
       // Validate file size
       if (!SizeUtils.isFileSizeValid(bytes.length, isImage: isImage)) {
+        print('createLocalFileFromBytes: File size validation failed');
         if (!kIsWeb) {
           final File tempFile = File(tempPath);
           if (await tempFile.exists()) {
             await tempFile.delete(); // Clean up
+            print('createLocalFileFromBytes: Cleaned up temp file');
           }
         }
         throw Exception(isImage ?
@@ -268,16 +283,21 @@ class FileService {
         );
       }
 
-      return LocalFile(
+      final localFile = LocalFile(
         id: _uuid.v4(),
         name: fileName,
         path: tempPath,
         size: bytes.length,
         type: mimeType ?? 'application/octet-stream',
         dateAdded: DateTime.now(),
+        bytes: kIsWeb ? bytes : null, // Store bytes in memory for web platform
       );
-    } catch (e) {
-      print('Error creating LocalFile from bytes: $e');
+
+      print('createLocalFileFromBytes: LocalFile created successfully - ID: ${localFile.id}, Name: ${localFile.name}');
+      return localFile;
+    } catch (e, stackTrace) {
+      print('ERROR in createLocalFileFromBytes: $e');
+      print('Stack trace: $stackTrace');
       return null;
     }
   }
