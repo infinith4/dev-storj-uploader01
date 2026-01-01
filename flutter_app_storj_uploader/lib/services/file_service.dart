@@ -92,6 +92,14 @@ class FileService {
   // Pick single video from gallery
   Future<LocalFile?> pickVideoFromGallery() async {
     try {
+      if (kIsWeb) {
+        final files = await pickFiles(
+          type: FileType.video,
+          allowMultiple: false,
+        );
+        return files.isNotEmpty ? files.first : null;
+      }
+
       final XFile? pickedFile = await _imagePicker.pickVideo(
         source: ImageSource.gallery,
         maxDuration: const Duration(minutes: 10),

@@ -11,24 +11,37 @@ const ImageGallery: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<StorjImageItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const PAGE_SIZE = 20;
+
+  const sortImages = (items: StorjImageItem[]) => {
+    return [...items].sort((a, b) => {
+      const aTime = Date.parse(a.modified_time.replace(' ', 'T'));
+      const bTime = Date.parse(b.modified_time.replace(' ', 'T'));
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+        return b.modified_time.localeCompare(a.modified_time);
+      }
+      return bTime - aTime;
+    });
+  };
 
   const loadImages = async () => {
     setIsLoading(true);
     setError(null);
+    setCurrentOffset(0);
+    setHasMore(true);
 
     try {
-      const response = await StorjUploaderAPI.getStorjImages({ limit: 100, offset: 0 });
+      const response = await StorjUploaderAPI.getStorjImages({ limit: PAGE_SIZE, offset: 0 });
 
       if (response.success) {
-        const sortedImages = [...response.images].sort((a, b) => {
-          const aTime = Date.parse(a.modified_time.replace(' ', 'T'));
-          const bTime = Date.parse(b.modified_time.replace(' ', 'T'));
-          if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
-            return b.modified_time.localeCompare(a.modified_time);
-          }
-          return bTime - aTime;
-        });
+        const sortedImages = sortImages(response.images);
         setImages(sortedImages);
+        setCurrentOffset(sortedImages.length);
+        setHasMore(response.images.length >= PAGE_SIZE);
       } else {
         setError(response.message || '画像の取得に失敗しました');
       }
@@ -37,6 +50,29 @@ const ImageGallery: React.FC = () => {
       console.error('Error loading images:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMoreImages = async () => {
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+
+    try {
+      const response = await StorjUploaderAPI.getStorjImages({
+        limit: PAGE_SIZE,
+        offset: currentOffset,
+      });
+
+      if (response.success) {
+        setImages(prev => sortImages([...prev, ...response.images]));
+        setCurrentOffset(prev => prev + response.images.length);
+        setHasMore(response.images.length >= PAGE_SIZE);
+      }
+    } catch (err) {
+      console.error('Error loading more images:', err);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -186,6 +222,25 @@ const ImageGallery: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+          <div className="flex justify-center pt-6">
+            {hasMore ? (
+              <button
+                onClick={loadMoreImages}
+                disabled={isLoadingMore}
+                className={`
+                  px-6 py-2 rounded-lg border transition-all
+                  ${isLoadingMore
+                    ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                    : 'bg-white text-blue-600 border-blue-600 hover:bg-blue-50'
+                  }
+                `}
+              >
+                {isLoadingMore ? '読み込み中...' : 'さらに読み込む'}
+              </button>
+            ) : (
+              <p className="text-sm text-gray-500">すべて読み込みました</p>
+            )}
           </div>
         </>
       )}
