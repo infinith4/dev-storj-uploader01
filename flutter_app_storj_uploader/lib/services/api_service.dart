@@ -243,6 +243,34 @@ class ApiService {
       return false;
     }
   }
+
+  // Get Storj Images List
+  Future<StorjImageListResponse> getStorjImages({
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/storj/images',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+        },
+      );
+      return StorjImageListResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
+  // Get Storj Image/Video URL
+  String getStorjMediaUrl(String path, {bool thumbnail = false}) {
+    final baseUrl = _dio.options.baseUrl.replaceAll(RegExp(r'/$'), '');
+    return '$baseUrl/storj/images/$path?thumbnail=$thumbnail';
+  }
+
+  // Get current base URL
+  String get baseUrl => _dio.options.baseUrl.replaceAll(RegExp(r'/$'), '');
 }
 
 // Custom Exception for API errors

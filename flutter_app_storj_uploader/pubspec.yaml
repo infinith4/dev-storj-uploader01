@@ -41,6 +41,10 @@ dependencies:
   dotted_border: ^2.1.0
   percent_indicator: ^4.2.3
 
+  # Media & Gallery
+  video_player: ^2.8.1
+  cached_network_image: ^3.3.1
+
   # Platform
   device_info_plus: ^9.1.1
   permission_handler: ^11.1.0
