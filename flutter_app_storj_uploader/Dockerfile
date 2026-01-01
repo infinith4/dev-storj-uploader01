@@ -23,9 +23,10 @@ RUN mkdir -p assets/images assets/icons && \
     fi
 
 # Enable web platform and build
+ENV FLUTTER_WEB_USE_SKIA=true
 RUN flutter config --enable-web && \
     flutter create . --platforms web && \
-    flutter build web --release
+    flutter build web --release --web-renderer canvaskit
 
 # Use nginx to serve the web app
 FROM nginx:alpine
