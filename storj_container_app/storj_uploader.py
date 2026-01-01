@@ -279,6 +279,13 @@ class StorjUploader:
         image_extensions = {'.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.tiff', '.gif'}
         return file_path.suffix.lower() in image_extensions
 
+    def _is_video_thumbnail(self, filename):
+        """
+        Check if file is a video thumbnail based on naming convention
+        Video thumbnails are named: {video_stem}_thumb.jpg
+        """
+        return filename.lower().endswith('_thumb.jpg')
+
     def generate_thumbnail(self, file_path, size=(300, 300)):
         """
         Generate thumbnail for image file
@@ -310,7 +317,12 @@ class StorjUploader:
             # Get file date (from filename or file system) and format as YYYYMM
             file_date = self.get_file_date(file_path)
             file_month = file_date.strftime("%Y%m")
-            remote_path = f"{self.remote_name}:{self.bucket_name}/{file_month}/"
+
+            # Video thumbnails go to thumbnails/YYYYMM/ directory
+            if self._is_video_thumbnail(file_path.name):
+                remote_path = f"{self.remote_name}:{self.bucket_name}/thumbnails/{file_month}/"
+            else:
+                remote_path = f"{self.remote_name}:{self.bucket_name}/{file_month}/"
 
             with self.lock:
                 print(f"[{thread_id}] Uploading {file_path.name} to {remote_path}... (date: {file_date.strftime('%Y-%m-%d')})")
