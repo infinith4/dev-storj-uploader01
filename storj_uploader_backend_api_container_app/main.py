@@ -89,6 +89,54 @@ def _get_video_content_type(filename: str) -> str:
     return VIDEO_MIME_TYPES.get(ext, "application/octet-stream")
 
 
+def _generate_video_placeholder(width: int = 320, height: int = 240) -> bytes:
+    """
+    Generate a placeholder image for videos without thumbnails.
+    Returns JPEG bytes of a gray image with a play icon.
+    """
+    try:
+        # Create a dark gray image
+        img = Image.new('RGB', (width, height), color=(48, 48, 48))
+
+        # Draw a simple play triangle using pixels (no ImageDraw dependency)
+        # Center of image
+        cx, cy = width // 2, height // 2
+
+        # Draw a circle-like area and play triangle by setting pixels
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(img)
+
+        # Draw a circle (play button background)
+        circle_radius = min(width, height) // 4
+        draw.ellipse(
+            [cx - circle_radius, cy - circle_radius, cx + circle_radius, cy + circle_radius],
+            fill=(80, 80, 80),
+            outline=(120, 120, 120),
+            width=2
+        )
+
+        # Draw play triangle
+        triangle_size = circle_radius // 2
+        triangle_points = [
+            (cx - triangle_size // 2 + 5, cy - triangle_size),
+            (cx - triangle_size // 2 + 5, cy + triangle_size),
+            (cx + triangle_size, cy)
+        ]
+        draw.polygon(triangle_points, fill=(200, 200, 200))
+
+        # Save to bytes
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=80)
+        return output.getvalue()
+    except Exception as e:
+        print(f"Error generating video placeholder: {e}")
+        # Return a minimal 1x1 gray JPEG as fallback
+        img = Image.new('RGB', (1, 1), color=(48, 48, 48))
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=80)
+        return output.getvalue()
+
+
 def _generate_video_thumbnail(
     video_path: str,
     bucket: str,
@@ -103,13 +151,6 @@ def _generate_video_thumbnail(
     if cache_path.exists() and cache_path.stat().st_size > 0:
         return True, cache_path.read_bytes(), "Success (cached)"
 
-    success, video_data, error_msg = storj_client.get_storj_image(
-        image_path=video_path,
-        bucket_name=bucket
-    )
-    if not success:
-        return False, b"", error_msg
-
     temp_dir = Path(os.getenv("TEMP_DIR", "./temp"))
     temp_dir.mkdir(exist_ok=True, parents=True)
 
@@ -122,7 +163,15 @@ def _generate_video_thumbnail(
             delete=False
         ) as temp_file:
             temp_video = Path(temp_file.name)
-            temp_file.write(video_data)
+
+        download_success, download_error = storj_client.download_storj_file_to_path(
+            object_path=video_path,
+            dest_path=temp_video,
+            bucket_name=bucket,
+            timeout=300
+        )
+        if not download_success:
+            return False, b"", download_error
 
         temp_thumb = temp_dir / f"{uuid.uuid4().hex}_thumb.jpg"
 
@@ -224,9 +273,14 @@ def _generate_video_thumbnail_from_blob(
         temp_cache_path.replace(cache_path)
 
         try:
+            # Upload thumbnail to thumbnails/YYYYMM/ directory
+            path_obj = Path(blob_name)
+            dir_name = path_obj.parent.name  # YYYYMM
+            file_stem = path_obj.stem  # filename without extension
+            thumb_blob_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
             blob_helper.upload_file(
                 str(temp_thumb),
-                blob_name=f"{Path(blob_name).with_suffix('')}_thumb.jpg",
+                blob_name=thumb_blob_path,
                 container_name=container
             )
         except Exception as upload_error:
@@ -1094,7 +1148,11 @@ async def get_storj_image(
 
             if thumbnail:
                 if is_video:
-                    thumbnail_path = f"{Path(image_path).with_suffix('')}_thumb.jpg"
+                    # Thumbnail is in thumbnails/YYYYMM/ directory
+                    path_obj = Path(image_path)
+                    dir_name = path_obj.parent.name  # YYYYMM
+                    file_stem = path_obj.stem  # filename without extension
+                    thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
                     if blob_helper.blob_exists(
                         thumbnail_path,
                         container_name=container_name
@@ -1106,10 +1164,11 @@ async def get_storj_image(
                         success = bool(image_data)
                         error_msg = "Success" if success else "Thumbnail is empty"
                     else:
-                        success, image_data, error_msg = _generate_video_thumbnail_from_blob(
-                            blob_name=image_path,
-                            container=container_name
-                        )
+                        # Return placeholder instead of generating thumbnail on-demand
+                        # On-demand generation is too slow and causes timeouts
+                        image_data = _generate_video_placeholder()
+                        success = True
+                        error_msg = "Placeholder (thumbnail not found)"
                 else:
                     image_data = blob_helper.download_blob_to_bytes(
                         blob_name=image_path,
@@ -1208,16 +1267,21 @@ async def get_storj_image(
         # サムネイルまたはフルサイズ画像を取得
         if thumbnail:
             if is_video:
-                thumbnail_path = f"{Path(image_path).with_suffix('')}_thumb.jpg"
+                # Thumbnail is in thumbnails/YYYYMM/ directory
+                path_obj = Path(image_path)
+                dir_name = path_obj.parent.name  # YYYYMM
+                file_stem = path_obj.stem  # filename without extension
+                thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
                 success, image_data, error_msg = storj_client.get_storj_image(
                     image_path=thumbnail_path,
                     bucket_name=bucket
                 )
                 if not success or not image_data:
-                    success, image_data, error_msg = _generate_video_thumbnail(
-                        video_path=image_path,
-                        bucket=bucket
-                    )
+                    # Return placeholder instead of generating thumbnail on-demand
+                    # On-demand generation is too slow and causes timeouts
+                    image_data = _generate_video_placeholder()
+                    success = True
+                    error_msg = "Placeholder (thumbnail not found)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,

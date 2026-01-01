@@ -34,9 +34,9 @@
 
 - **名前**: `stjup2-flutter-udm3tutq7eb7i`
 - **タイプ**: コンテナー アプリ
-- **URL**: https://stjup2-flutter-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io *(要デプロイ)*
+- **URL**: https://stjup2-flutter-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io _(要デプロイ)_
 - **コンテナイメージ**: `stjup2acrudm3tutq7eb7i.azurecr.io/storj-flutter:latest`
-- **用途**: Flutter Web アプリ（モバイル/デスクトップ/Web対応）
+- **用途**: Flutter Web アプリ（モバイル/デスクトップ/Web 対応）
 - **設定**:
   - `.env` ファイルで API URL を設定
   - nginx で静的ファイルを配信
@@ -264,3 +264,23 @@ az keyvault set-policy \
 | 日付       | 変更内容                                   |
 | ---------- | ------------------------------------------ |
 | 2025-12-31 | 初版作成 - 現在の Azure 環境の構成を文書化 |
+
+```
+# リビジョンを更新して再起動
+az containerapp update \
+  --name stjup2-backend-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
+
+az containerapp update \
+  --name stjup2-frontend-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
+
+az containerapp update \
+  --name stjup2-flutter-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
+
+az containerapp update \
+  --name stjup2-storj-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
+
+```

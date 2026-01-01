@@ -26,6 +26,9 @@
   <meta name="apple-mobile-web-app-title" content="storj_uploader_flutter">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
+  <!-- Load CanvasKit from local assets -->
+  <link rel="preload" href="canvaskit/canvaskit.wasm" as="fetch" type="application/wasm" crossorigin>
+
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
@@ -33,6 +36,13 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Prefer local CanvasKit assets instead of the CDN.
+    window.flutterWebRenderer = "canvaskit";
+    window.flutterCanvasKitBaseUrl = "canvaskit/";
+    window.flutterConfiguration = window.flutterConfiguration || {};
+    window.flutterConfiguration.canvasKitBaseUrl = "canvaskit/";
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

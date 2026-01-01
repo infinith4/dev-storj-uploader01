@@ -166,10 +166,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
+            Tab(icon: Icon(Icons.photo_library), text: 'Gallery'),
             Tab(icon: Icon(Icons.upload), text: 'Upload'),
             Tab(icon: Icon(Icons.queue), text: 'Queue'),
             Tab(icon: Icon(Icons.info), text: 'Status'),
-            Tab(icon: Icon(Icons.photo_library), text: 'Gallery'),
           ],
         ),
       ),
@@ -186,6 +186,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
+                // Gallery Tab
+                const GalleryScreen(),
+
                 // Upload Tab
                 _buildUploadTab(),
 
@@ -194,9 +197,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                 // Status Tab
                 _buildStatusTab(),
-
-                // Gallery Tab
-                const GalleryScreen(),
               ],
             ),
           ),
