@@ -292,22 +292,49 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(width: UIConstants.smallPadding),
-                    DropdownButtonHideUnderline(
-                      child: DropdownButton<GallerySortOption>(
-                        value: _sortOption,
-                        items: GallerySortOption.values.map((option) {
-                          return DropdownMenuItem(
+                    PopupMenuButton<GallerySortOption>(
+                      tooltip: 'ソート',
+                      initialValue: _sortOption,
+                      onSelected: (value) {
+                        setState(() {
+                          _sortOption = value;
+                          _images = _sortImages(_images);
+                        });
+                      },
+                      itemBuilder: (context) {
+                        return GallerySortOption.values.map((option) {
+                          return CheckedPopupMenuItem<GallerySortOption>(
                             value: option,
+                            checked: option == _sortOption,
                             child: Text(_sortOptionLabel(option)),
                           );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _sortOption = value;
-                            _images = _sortImages(_images);
-                          });
-                        },
+                        }).toList();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _sortOptionLabel(_sortOption),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.expand_more,
+                              size: 18,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     IconButton(
