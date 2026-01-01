@@ -246,6 +246,7 @@ app.add_middleware(
         "http://127.0.0.1:8080",
         # Azure Container Apps URLs
         "https://stjup2-frontend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io",
+        "https://stjup2-flutter-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io",
         "https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io",
     ],
     allow_credentials=True,
@@ -832,16 +833,19 @@ async def trigger_upload_async():
 async def get_storj_images(
     limit: int = 100,
     offset: int = 0,
-    bucket: str = None
+    bucket: str = None,
+    request: Request = None
 ):
     """
     Storjに保存されている画像リストを取得
     """
     try:
+        base_url = str(request.base_url).rstrip("/") if request else None
         success, images, message = storj_client.list_storj_images(
             bucket_name=bucket,
             limit=limit,
-            offset=offset
+            offset=offset,
+            base_url=base_url
         )
 
         if not success:

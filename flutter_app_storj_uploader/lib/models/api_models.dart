@@ -317,6 +317,18 @@ class StorjImageItem {
   final String url;
   final bool isVideo;
 
+  static const Set<String> _videoExtensions = {
+    '.mp4',
+    '.mov',
+    '.avi',
+    '.mkv',
+    '.webm',
+    '.m4v',
+    '.3gp',
+    '.flv',
+    '.wmv',
+  };
+
   StorjImageItem({
     required this.filename,
     required this.path,
@@ -327,15 +339,54 @@ class StorjImageItem {
     required this.isVideo,
   });
 
+  static bool _looksLikeVideoPath(String value) {
+    if (value.isEmpty) return false;
+    final normalized = value.toLowerCase();
+    final pathOnly = normalized.split('?').first;
+    final dotIndex = pathOnly.lastIndexOf('.');
+    if (dotIndex < 0) return false;
+    return _videoExtensions.contains(pathOnly.substring(dotIndex));
+  }
+
+  static bool _parseIsVideo(
+    dynamic rawValue,
+    String filename,
+    String path,
+    String url,
+    String thumbnailUrl,
+  ) {
+    if (rawValue is bool) return rawValue;
+    if (rawValue is num) return rawValue != 0;
+    if (rawValue is String) {
+      final normalized = rawValue.trim().toLowerCase();
+      if (normalized == 'true') return true;
+      if (normalized == 'false') return false;
+    }
+    return _looksLikeVideoPath(filename) ||
+        _looksLikeVideoPath(path) ||
+        _looksLikeVideoPath(url) ||
+        _looksLikeVideoPath(thumbnailUrl);
+  }
+
   factory StorjImageItem.fromJson(Map<String, dynamic> json) {
+    final filename = json['filename'] ?? '';
+    final path = json['path'] ?? '';
+    final thumbnailUrl = json['thumbnail_url'] ?? '';
+    final url = json['url'] ?? '';
     return StorjImageItem(
-      filename: json['filename'] ?? '',
-      path: json['path'] ?? '',
+      filename: filename,
+      path: path,
       size: json['size'] ?? 0,
       modifiedTime: json['modified_time'] ?? '',
-      thumbnailUrl: json['thumbnail_url'] ?? '',
-      url: json['url'] ?? '',
-      isVideo: json['is_video'] ?? false,
+      thumbnailUrl: thumbnailUrl,
+      url: url,
+      isVideo: _parseIsVideo(
+        json['is_video'],
+        filename,
+        path,
+        url,
+        thumbnailUrl,
+      ),
     );
   }
 
@@ -360,12 +411,16 @@ class StorjImageItem {
 
 // Storj Image List Response
 class StorjImageListResponse {
+  final bool success;
+  final String? message;
   final List<StorjImageItem> images;
   final int total;
   final int limit;
   final int offset;
 
   StorjImageListResponse({
+    required this.success,
+    this.message,
     required this.images,
     required this.total,
     required this.limit,
@@ -373,12 +428,17 @@ class StorjImageListResponse {
   });
 
   factory StorjImageListResponse.fromJson(Map<String, dynamic> json) {
+    final images = (json['images'] as List<dynamic>?)
+            ?.map((item) => StorjImageItem.fromJson(item as Map<String, dynamic>))
+            .toList() ??
+        [];
+    final totalCount = json['total_count'] ?? json['total'] ?? 0;
     return StorjImageListResponse(
-      images: (json['images'] as List<dynamic>?)
-          ?.map((item) => StorjImageItem.fromJson(item as Map<String, dynamic>))
-          .toList() ?? [],
-      total: json['total'] ?? 0,
-      limit: json['limit'] ?? 100,
+      success: json['success'] ?? true,
+      message: json['message'],
+      images: images,
+      total: totalCount is int ? totalCount : 0,
+      limit: json['limit'] ?? images.length,
       offset: json['offset'] ?? 0,
     );
   }

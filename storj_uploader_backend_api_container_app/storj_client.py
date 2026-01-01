@@ -283,7 +283,13 @@ class StorjClient:
                 "storj_app_available": False
             }
 
-    def list_storj_images(self, bucket_name: str = None, limit: int = 100, offset: int = 0) -> Tuple[bool, list, str]:
+    def list_storj_images(
+        self,
+        bucket_name: str = None,
+        limit: int = 100,
+        offset: int = 0,
+        base_url: str = None
+    ) -> Tuple[bool, list, str]:
         """
         Storjからrcloneを使って画像リストを取得
         Returns: (success: bool, images: list, error_message: str)
@@ -373,7 +379,7 @@ class StorjClient:
                     size = 0
 
                 # Generate URLs for media access
-                api_base_url = os.getenv("API_BASE_URL", "http://10.0.2.2:8010")
+                api_base_url = (base_url or os.getenv("API_BASE_URL") or "http://localhost:8010").rstrip("/")
                 full_url = f"{api_base_url}/storj/images/{path}?thumbnail=false"
 
                 # Determine thumbnail URL

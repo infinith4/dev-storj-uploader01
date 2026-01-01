@@ -267,6 +267,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
       );
     }
 
+    final videoCount = _images.where((item) => item.isVideo).length;
+    final imageCount = _images.length - videoCount;
+
     return RefreshIndicator(
       onRefresh: _loadImages,
       child: Column(
@@ -281,7 +284,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               runSpacing: UIConstants.smallPadding,
               children: [
                 Text(
-                  '${_images.length} items',
+                  '$imageCount images • $videoCount videos • ${_images.length} total',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 Row(
