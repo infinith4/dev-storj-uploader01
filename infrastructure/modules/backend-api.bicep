@@ -46,6 +46,9 @@ param storjBucketName string
 @description('Storj Remote Name')
 param storjRemoteName string = 'storj'
 
+@description('Gallery source (storj, blob, storage)')
+param gallerySource string = 'storj'
+
 @description('Max file size in bytes')
 param maxFileSize int = 100000000
 
@@ -141,6 +144,10 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'STORJ_REMOTE_NAME'
               value: storjRemoteName
+            }
+            {
+              name: 'GALLERY_SOURCE'
+              value: gallerySource
             }
             {
               name: 'RCLONE_CONFIG'

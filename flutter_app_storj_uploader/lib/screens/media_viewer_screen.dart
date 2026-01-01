@@ -69,14 +69,29 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
 
     final url = _resolveMediaUrl(item);
-    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      httpHeaders: const {
+        'Accept': '*/*',
+      },
+    );
     _videoController = controller;
     _videoInitializeFuture = controller.initialize().then((_) {
       if (mounted) {
         setState(() {});
       }
+    }).catchError((error) {
+      // エラーが発生してもcontrollerの状態で判断するため、stateを更新
+      if (mounted) {
+        setState(() {});
+      }
     });
-    await controller.setLooping(false);
+
+    try {
+      await controller.setLooping(false);
+    } catch (e) {
+      // ループ設定のエラーは無視
+    }
   }
 
   String _resolveMediaUrl(StorjImageItem item, {bool thumbnail = false}) {
@@ -253,6 +268,95 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
   }
 
+  Widget _buildVideoError(StorjImageItem item, String? errorDescription) {
+    final isFormatError = errorDescription?.contains('FORMAT') == true ||
+        errorDescription?.contains('MEDIA_ELEMENT') == true;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(UIConstants.defaultPadding),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // サムネイル表示
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                _resolveMediaUrl(item, thumbnail: true),
+                height: 200,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.videocam_off,
+                  color: Colors.white38,
+                  size: 64,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Icon(
+              isFormatError ? Icons.warning_amber_rounded : Icons.error_outline,
+              color: isFormatError ? Colors.amber : Colors.red,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isFormatError
+                  ? 'ブラウザでこの動画形式を再生できません'
+                  : '動画の読み込みに失敗しました',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isFormatError
+                  ? 'H.265/HEVC やこの動画コーデックはブラウザでサポートされていません。\nダウンロードして別のプレイヤーで再生してください。'
+                  : errorDescription ?? 'Unknown error',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _downloadCurrent,
+                  icon: const Icon(Icons.download),
+                  label: const Text('ダウンロード'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _setupVideoControllerIfNeeded(item);
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('再試行'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: const BorderSide(color: Colors.white38),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '${item.filename}\n${item.formattedSize}',
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildVideoPlayer(StorjImageItem item) {
     final controller = _videoController;
     if (controller == null) {
@@ -271,16 +375,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         }
 
         if (controller.value.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(UIConstants.defaultPadding),
-              child: Text(
-                controller.value.errorDescription ?? 'Failed to play video',
-                style: const TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
+          return _buildVideoError(item, controller.value.errorDescription);
         }
 
         return ValueListenableBuilder(
