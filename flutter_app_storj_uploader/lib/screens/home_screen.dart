@@ -58,10 +58,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _loadSystemStatus() async {
-    if (!_isConnected) return;
+    if (!_isConnected) {
+      print('DEBUG _loadSystemStatus: Not connected, skipping');
+      return;
+    }
 
     try {
+      print('DEBUG _loadSystemStatus: Fetching status...');
       final status = await ApiService().getStatus();
+      print('DEBUG _loadSystemStatus: Got status - storjServiceRunning: ${status.storjServiceRunning}');
+      print('DEBUG _loadSystemStatus: uploadQueueCount: ${status.uploadQueueCount}, totalUploaded: ${status.totalUploaded}');
       if (mounted) {
         setState(() {
           _systemStatus = status;
