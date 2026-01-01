@@ -1008,7 +1008,125 @@ async def get_storj_image(
     print(f"====================")
 
     try:
+        gallery_source = os.getenv("GALLERY_SOURCE", "").lower()
+        use_blob_gallery = gallery_source in ("azure", "blob", "storage") and blob_helper
         is_video = VideoProcessor.is_video_file(image_path)
+
+        if use_blob_gallery:
+            container_name = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+            if not blob_helper.blob_exists(
+                image_path,
+                container_name=container_name
+            ):
+                raise HTTPException(status_code=404, detail="Blob not found")
+
+            if is_video and not thumbnail:
+                props = blob_helper.get_blob_properties(
+                    blob_name=image_path,
+                    container_name=container_name
+                )
+                file_size = props.get("size")
+                if not isinstance(file_size, int) or file_size <= 0:
+                    raise HTTPException(status_code=404, detail="Invalid file size")
+
+                range_header = request.headers.get("range") if request else None
+                range_tuple = _parse_range_header(range_header, file_size) if range_header else None
+                if range_header and not range_tuple:
+                    return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+                if range_tuple:
+                    start, end = range_tuple
+                    content_length = end - start + 1
+                    status_code = 206
+                else:
+                    start, end = 0, file_size - 1
+                    content_length = file_size
+                    status_code = 200
+
+                stream_iter = blob_helper.stream_blob(
+                    blob_name=image_path,
+                    container_name=container_name,
+                    offset=start if range_tuple else None,
+                    length=content_length if range_tuple else None
+                )
+
+                headers = {
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length)
+                }
+                if range_tuple:
+                    headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+
+                return StreamingResponse(
+                    stream_iter,
+                    media_type=_get_video_content_type(image_path),
+                    headers=headers,
+                    status_code=status_code
+                )
+
+            if thumbnail:
+                if is_video:
+                    thumbnail_path = f"{Path(image_path).with_suffix('')}_thumb.jpg"
+                    if blob_helper.blob_exists(
+                        thumbnail_path,
+                        container_name=container_name
+                    ):
+                        image_data = blob_helper.download_blob_to_bytes(
+                            blob_name=thumbnail_path,
+                            container_name=container_name
+                        )
+                        success = bool(image_data)
+                        error_msg = "Success" if success else "Thumbnail is empty"
+                    else:
+                        success, image_data, error_msg = _generate_video_thumbnail_from_blob(
+                            blob_name=image_path,
+                            container=container_name
+                        )
+                else:
+                    image_data = blob_helper.download_blob_to_bytes(
+                        blob_name=image_path,
+                        container_name=container_name
+                    )
+                    success, image_data, error_msg = _generate_image_thumbnail(image_data)
+            else:
+                image_data = blob_helper.download_blob_to_bytes(
+                    blob_name=image_path,
+                    container_name=container_name
+                )
+                success = bool(image_data)
+                error_msg = "Success" if success else "Blob is empty"
+
+            if not success:
+                raise HTTPException(status_code=404, detail=error_msg)
+
+            if thumbnail:
+                content_type = 'image/jpeg'
+            else:
+                if is_video:
+                    content_type = _get_video_content_type(image_path)
+                else:
+                    ext = image_path.lower().split('.')[-1]
+                    content_type_map = {
+                        'jpg': 'image/jpeg',
+                        'jpeg': 'image/jpeg',
+                        'png': 'image/png',
+                        'webp': 'image/webp',
+                        'heic': 'image/heic',
+                        'bmp': 'image/bmp',
+                        'tiff': 'image/tiff',
+                        'gif': 'image/gif'
+                    }
+                    content_type = content_type_map.get(ext, 'image/jpeg')
+
+            cache_max_age = 86400 if thumbnail else 3600
+            etag_source = f"{image_path}|{'thumb' if thumbnail else 'full'}"
+            etag_hash = hashlib.sha256(etag_source.encode("utf-8")).hexdigest()
+            headers = {
+                "Cache-Control": f"public, max-age={cache_max_age}",
+                "ETag": f"\"sha256-{etag_hash}\""
+            }
+
+            return Response(content=image_data, media_type=content_type, headers=headers)
 
         if is_video and not thumbnail:
             info_success, info, info_error = storj_client.get_storj_object_info(

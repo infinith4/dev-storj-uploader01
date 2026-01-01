@@ -2,7 +2,13 @@ name: Android CI/CD
 
 on:
   push:
-    branches: ["main", "master", "develop", "claude/**"]
+    branches:
+      [
+        "main",
+        "master",
+        "develop",
+        "claude/**",
+      ]
     paths:
       - "android_storj_uploader/**"
       - ".github/workflows/android-build.yml"
