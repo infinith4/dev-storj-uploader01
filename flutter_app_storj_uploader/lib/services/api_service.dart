@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../models/api_models.dart';
 import '../utils/constants.dart';
+import 'browser_upload.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -212,6 +213,24 @@ class ApiService {
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
     }
+  }
+
+  // Upload from Browser File (web only, avoids loading bytes into memory)
+  Future<UploadResponse> uploadFromBrowserFile(
+    Object file, {
+    required bool isImage,
+    Function(int sent, int total)? onSendProgress,
+  }) async {
+    final endpoint = isImage ? '/upload/single' : '/upload/files/single';
+    final base = Uri.parse(_dio.options.baseUrl);
+    final url = base.resolve(endpoint);
+
+    final data = await uploadBrowserFile(
+      url: url,
+      file: file,
+      onSendProgress: onSendProgress,
+    );
+    return UploadResponse.fromJson(data);
   }
 
   // Trigger Manual Storj Upload

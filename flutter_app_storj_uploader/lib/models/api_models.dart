@@ -259,6 +259,7 @@ class LocalFile {
   final FileUploadStatus uploadStatus;
   final String? errorMessage;
   final Uint8List? bytes; // For web platform - stores file data in memory
+  final Object? webFile; // For web platform - stores a browser File reference
 
   LocalFile({
     required this.id,
@@ -271,6 +272,7 @@ class LocalFile {
     this.uploadStatus = FileUploadStatus.pending,
     this.errorMessage,
     this.bytes,
+    this.webFile,
   });
 
   LocalFile copyWith({
@@ -284,6 +286,7 @@ class LocalFile {
     FileUploadStatus? uploadStatus,
     String? errorMessage,
     Uint8List? bytes,
+    Object? webFile,
   }) {
     return LocalFile(
       id: id ?? this.id,
@@ -296,6 +299,7 @@ class LocalFile {
       uploadStatus: uploadStatus ?? this.uploadStatus,
       errorMessage: errorMessage ?? this.errorMessage,
       bytes: bytes ?? this.bytes,
+      webFile: webFile ?? this.webFile,
     );
   }
 }

@@ -408,7 +408,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           try {
             // Web platform uses byte data instead of File I/O
             if (kIsWeb) {
-              // For web, use bytes stored in LocalFile
+              final isImage = FileTypeUtils.isImageFile(
+                localFile.name.split('.').last.toLowerCase(),
+              );
+
+              if (localFile.webFile != null) {
+                print('Uploading file from browser FormData: ${localFile.name}');
+                await ApiService().uploadFromBrowserFile(
+                  localFile.webFile!,
+                  isImage: isImage,
+                );
+                successCount++;
+                continue;
+              }
+
+              // Fallback to in-memory bytes when browser file is unavailable
               if (localFile.bytes == null) {
                 throw Exception('File data not available for web upload: ${localFile.name}');
               }
