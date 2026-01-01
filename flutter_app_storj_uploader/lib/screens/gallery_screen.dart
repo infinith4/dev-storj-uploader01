@@ -246,6 +246,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildGridItem(StorjImageItem item) {
+    final thumbnailUrl = item.thumbnailUrl.isNotEmpty
+        ? item.thumbnailUrl
+        : ApiService().getStorjMediaUrl(item.path, thumbnail: true);
     return GestureDetector(
       onTap: () => _openMediaViewer(item),
       child: Stack(
@@ -253,7 +256,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         children: [
           // Thumbnail
           CachedNetworkImage(
-            imageUrl: item.thumbnailUrl,
+            imageUrl: thumbnailUrl,
             fit: BoxFit.cover,
             placeholder: (context, url) => Container(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,

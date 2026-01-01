@@ -44,6 +44,7 @@ dependencies:
   # Media & Gallery
   video_player: ^2.8.1
   cached_network_image: ^3.3.1
+  url_launcher: ^6.2.2
 
   # Platform
   device_info_plus: ^9.1.1
