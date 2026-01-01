@@ -13,3 +13,4 @@ rclone.conf
 /flutter
 storj_local_structure
 venv
+/AZURE_ENV_SECRET.md
