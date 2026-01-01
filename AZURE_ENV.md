@@ -266,19 +266,21 @@ az keyvault set-policy \
 | 2025-12-31 | 初版作成 - 現在の Azure 環境の構成を文書化 |
 
 ```
-az containerapp restart \
- --name stjup2-frontend-udm3tutq7eb7i \
- --resource-group rg-dev-storjup
+# リビジョンを更新して再起動
+az containerapp update \
+  --name stjup2-backend-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
 
-az containerapp restart \
- --name stjup2-backend-udm3tutq7eb7i \
- --resource-group rg-dev-storjup
+az containerapp update \
+  --name stjup2-frontend-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
 
-az containerapp restart \
- --name stjup2-flutter-udm3tutq7eb7i \
- --resource-group rg-dev-storjup
+az containerapp update \
+  --name stjup2-flutter-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
 
-az containerapp restart \
- --name stjup2-storj-udm3tutq7eb7i \
- --resource-group rg-dev-storjup
+az containerapp update \
+  --name stjup2-storj-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup
+
 ```
