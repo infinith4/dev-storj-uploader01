@@ -8,6 +8,7 @@ import 'package:mime/mime.dart';
 import 'package:uuid/uuid.dart';
 import '../models/api_models.dart';
 import '../utils/constants.dart';
+import 'web_file_picker.dart';
 
 class FileService {
   static final FileService _instance = FileService._internal();
@@ -37,6 +38,15 @@ class FileService {
   // Pick single image from gallery
   Future<LocalFile?> pickImageFromGallery() async {
     try {
+      if (kIsWeb) {
+        final webFiles = await pickWebFiles(
+          allowMultiple: false,
+          accept: 'image/*',
+        );
+        if (webFiles.isEmpty) return null;
+        return _createLocalFileFromWebPickedFile(webFiles.first);
+      }
+
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
@@ -54,6 +64,14 @@ class FileService {
   // Pick multiple images from gallery
   Future<List<LocalFile>> pickMultipleImages() async {
     try {
+      if (kIsWeb) {
+        final webFiles = await pickWebFiles(
+          allowMultiple: true,
+          accept: 'image/*',
+        );
+        return _createLocalFilesFromWebPicked(webFiles);
+      }
+
       final List<XFile> pickedFiles = await _imagePicker.pickMultiImage(
         imageQuality: 85,
       );
@@ -93,11 +111,12 @@ class FileService {
   Future<LocalFile?> pickVideoFromGallery() async {
     try {
       if (kIsWeb) {
-        final files = await pickFiles(
-          type: FileType.video,
+        final webFiles = await pickWebFiles(
           allowMultiple: false,
+          accept: 'video/*',
         );
-        return files.isNotEmpty ? files.first : null;
+        if (webFiles.isEmpty) return null;
+        return _createLocalFileFromWebPickedFile(webFiles.first);
       }
 
       final XFile? pickedFile = await _imagePicker.pickVideo(
@@ -117,7 +136,14 @@ class FileService {
   // Pick multiple videos from gallery
   Future<List<LocalFile>> pickMultipleVideos() async {
     try {
-      // Use file picker for multiple video selection
+      if (kIsWeb) {
+        final webFiles = await pickWebFiles(
+          allowMultiple: true,
+          accept: 'video/*',
+        );
+        return _createLocalFilesFromWebPicked(webFiles);
+      }
+
       return await pickFiles(
         type: FileType.video,
         allowMultiple: true,
@@ -135,6 +161,15 @@ class FileService {
     bool allowMultiple = true,
   }) async {
     try {
+      if (kIsWeb) {
+        final accept = _buildAcceptAttribute(type, allowedExtensions);
+        final webFiles = await pickWebFiles(
+          allowMultiple: allowMultiple,
+          accept: accept,
+        );
+        return _createLocalFilesFromWebPicked(webFiles);
+      }
+
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: type,
         allowedExtensions: allowedExtensions,
@@ -187,6 +222,71 @@ class FileService {
       allowedExtensions: AppConstants.supportedDocumentTypes,
       allowMultiple: allowMultiple,
     );
+  }
+
+  String? _buildAcceptAttribute(
+    FileType type,
+    List<String>? allowedExtensions,
+  ) {
+    if (allowedExtensions != null && allowedExtensions.isNotEmpty) {
+      return allowedExtensions.map((ext) => '.$ext').join(',');
+    }
+
+    switch (type) {
+      case FileType.image:
+        return 'image/*';
+      case FileType.video:
+        return 'video/*';
+      case FileType.audio:
+        return 'audio/*';
+      case FileType.media:
+        return 'image/*,video/*';
+      default:
+        return null;
+    }
+  }
+
+  List<LocalFile> _createLocalFilesFromWebPicked(
+    List<WebPickedFile> webFiles,
+  ) {
+    final localFiles = <LocalFile>[];
+    for (final webFile in webFiles) {
+      final localFile = _createLocalFileFromWebPickedFile(webFile);
+      if (localFile != null) {
+        localFiles.add(localFile);
+      }
+    }
+    return localFiles;
+  }
+
+  LocalFile? _createLocalFileFromWebPickedFile(WebPickedFile webFile) {
+    try {
+      final fileName = webFile.name;
+      final fileSize = webFile.size;
+      final mimeType = webFile.mimeType ?? 'application/octet-stream';
+
+      final isImage = FileTypeUtils.isImageFile(_getFileExtension(fileName));
+      if (!SizeUtils.isFileSizeValid(fileSize, isImage: isImage)) {
+        throw Exception(isImage
+            ? 'Image file is too large (max ${SizeUtils.formatBytes(AppConstants.maxImageSize)})'
+            : 'File is too large (max ${SizeUtils.formatBytes(AppConstants.maxFileSize)})');
+      }
+
+      final id = _uuid.v4();
+      final path = 'web_file_${id}_$fileName';
+      return LocalFile(
+        id: id,
+        name: fileName,
+        path: path,
+        size: fileSize,
+        type: mimeType,
+        dateAdded: DateTime.now(),
+        webFile: webFile.file,
+      );
+    } catch (e) {
+      print('Error creating LocalFile from web file: $e');
+      return null;
+    }
   }
 
   // Create LocalFile from XFile (ImagePicker)

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../models/api_models.dart';
 import '../utils/constants.dart';
+import 'browser_upload.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -214,6 +215,24 @@ class ApiService {
     }
   }
 
+  // Upload from Browser File (web only, avoids loading bytes into memory)
+  Future<UploadResponse> uploadFromBrowserFile(
+    Object file, {
+    required bool isImage,
+    Function(int sent, int total)? onSendProgress,
+  }) async {
+    final endpoint = isImage ? '/upload/single' : '/upload/files/single';
+    final base = Uri.parse(_dio.options.baseUrl);
+    final url = base.resolve(endpoint);
+
+    final data = await uploadBrowserFile(
+      url: url,
+      file: file,
+      onSendProgress: onSendProgress,
+    );
+    return UploadResponse.fromJson(data);
+  }
+
   // Trigger Manual Storj Upload
   Future<TriggerUploadResponse> triggerUpload() async {
     try {
@@ -267,6 +286,21 @@ class ApiService {
         );
       }
       return parsed;
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
+  // Delete Storj Images/Videos
+  Future<DeleteMediaResponse> deleteStorjMedia(List<String> paths) async {
+    try {
+      final response = await _dio.post(
+        '/storj/images/delete',
+        data: {
+          'paths': paths,
+        },
+      );
+      return DeleteMediaResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
     }

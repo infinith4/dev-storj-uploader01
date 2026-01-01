@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter_dropzone/flutter_dropzone.dart';
 import 'dart:html' as html;
-import 'dart:js_util' as js_util;
+import 'package:uuid/uuid.dart';
 import '../models/api_models.dart';
 import '../services/file_service.dart';
 import '../utils/constants.dart';
@@ -31,6 +29,7 @@ class _FileUploadAreaState extends State<FileUploadArea>
   late Animation<double> _scaleAnimation;
   DropzoneViewController? _dropzoneController;
   bool _dropInProgress = false;
+  final Uuid _uuid = const Uuid();
 
   void _scheduleDropReset() {
     Future.delayed(const Duration(milliseconds: 300), () {
@@ -259,30 +258,20 @@ class _FileUploadAreaState extends State<FileUploadArea>
         return;
       }
 
-      // Read file as bytes
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(file);
-      await reader.onLoadEnd.first;
+      final id = _uuid.v4();
+      final localFile = LocalFile(
+        id: id,
+        name: name,
+        path: 'web_file_${id}_$name',
+        size: size,
+        type: mimeType.isNotEmpty ? mimeType : 'application/octet-stream',
+        dateAdded: DateTime.now(),
+        webFile: file,
+      );
 
-      if (reader.result == null) {
-        print('ERROR: FileReader result is null');
-        _showErrorSnackBar('Failed to read file');
-        return;
-      }
-
-      final bytes = reader.result as Uint8List;
-      print('DEBUG: File data loaded: ${bytes.length} bytes');
-
-      // Create LocalFile
-      final localFile = await FileService().createLocalFileFromBytes(bytes, name);
-      if (localFile != null) {
-        print('LocalFile created successfully: ${localFile.name}');
-        widget.onFilesSelected([localFile]);
-        _showSuccessAnimation();
-      } else {
-        print('ERROR: createLocalFileFromBytes returned null');
-        _showErrorSnackBar('Failed to process file');
-      }
+      print('LocalFile created successfully: ${localFile.name}');
+      widget.onFilesSelected([localFile]);
+      _showSuccessAnimation();
     } catch (e, stackTrace) {
       print('ERROR processing HTML file: $e');
       print('Stack trace: $stackTrace');
@@ -390,18 +379,16 @@ class _FileUploadAreaState extends State<FileUploadArea>
         return null;
       }
 
-      // Read file as bytes
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(file);
-      await reader.onLoadEnd.first;
-
-      if (reader.result == null) {
-        print('ERROR: FileReader result is null for $name');
-        return null;
-      }
-
-      final bytes = reader.result as Uint8List;
-      return await FileService().createLocalFileFromBytes(bytes, name);
+      final id = _uuid.v4();
+      return LocalFile(
+        id: id,
+        name: name,
+        path: 'web_file_${id}_$name',
+        size: size,
+        type: mimeType.isNotEmpty ? mimeType : 'application/octet-stream',
+        dateAdded: DateTime.now(),
+        webFile: file,
+      );
     } catch (e) {
       print('ERROR processing HTML file: $e');
       return null;
