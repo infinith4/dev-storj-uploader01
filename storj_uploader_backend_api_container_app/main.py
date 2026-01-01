@@ -1277,10 +1277,11 @@ async def get_storj_image(
                     bucket_name=bucket
                 )
                 if not success or not image_data:
-                    success, image_data, error_msg = _generate_video_thumbnail(
-                        video_path=image_path,
-                        bucket=bucket
-                    )
+                    # Return placeholder instead of generating thumbnail on-demand
+                    # On-demand generation is too slow and causes timeouts
+                    image_data = _generate_video_placeholder()
+                    success = True
+                    error_msg = "Placeholder (thumbnail not found)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,
