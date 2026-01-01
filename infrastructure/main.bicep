@@ -71,6 +71,9 @@ param storjBucketName string
 @description('Storj Remote Name')
 param storjRemoteName string = 'storj'
 
+@description('Gallery source (storj, blob, storage)')
+param gallerySource string = 'storj'
+
 @description('rclone.conf content')
 @secure()
 param rcloneConfig string
@@ -209,6 +212,7 @@ module backendApi 'modules/backend-api.bicep' = {
     rcloneConfig: rcloneConfig
     storjBucketName: storjBucketName
     storjRemoteName: storjRemoteName
+    gallerySource: gallerySource
     maxFileSize: maxFileSize
     apiBaseUrl: 'https://${backendAppName}.${environment.outputs.defaultDomain}'
   }
