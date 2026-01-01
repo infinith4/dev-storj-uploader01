@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Download, ZoomIn, ZoomOut } from 'lucide-react';
 import { StorjImageItem } from '../types';
 import { StorjUploaderAPI } from '../api';
@@ -15,6 +15,13 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [forceVideo, setForceVideo] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [mediaVersion, setMediaVersion] = useState(0);
+  const retryTimeoutRef = useRef<number | null>(null);
+
+  const MAX_RETRIES = 3;
+  const RETRY_BASE_DELAY_MS = 1500;
 
   useEffect(() => {
     if (isOpen) {
@@ -22,6 +29,9 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
       setError(null);
       setZoom(1);
       setForceVideo(false);
+      setRetryCount(0);
+      setIsRetrying(false);
+      setMediaVersion(0);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
@@ -30,6 +40,10 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
     }
 
     return () => {
+      if (retryTimeoutRef.current !== null) {
+        window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
@@ -39,6 +53,14 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
   const isVideo = forceVideo || resolveIsVideo(image);
   const imageUrl = StorjUploaderAPI.getStorjImageUrl(image.path);
   const posterUrl = image.thumbnail_url || StorjUploaderAPI.getStorjThumbnailUrl(image.path);
+  const mediaUrl = mediaVersion > 0 ? `${imageUrl}&retry=${mediaVersion}` : imageUrl;
+
+  const clearRetryTimer = () => {
+    if (retryTimeoutRef.current !== null) {
+      window.clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+  };
 
   const handleDownload = () => {
     const link = document.createElement('a');
@@ -70,6 +92,64 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
       return;
     }
     onClose();
+  };
+
+  const probeMediaStatus = async (): Promise<number | null> => {
+    try {
+      const response = await fetch(imageUrl, { method: 'HEAD', cache: 'no-store' });
+      return response.status;
+    } catch (probeError) {
+      console.error('Media probe failed:', probeError);
+      return null;
+    }
+  };
+
+  const handleMediaLoaded = () => {
+    clearRetryTimer();
+    setIsLoading(false);
+    setIsRetrying(false);
+    setError(null);
+    setRetryCount(0);
+  };
+
+  const handleManualRetry = () => {
+    clearRetryTimer();
+    setIsLoading(true);
+    setIsRetrying(false);
+    setError(null);
+    setRetryCount(0);
+    setMediaVersion(prev => prev + 1);
+  };
+
+  const handleMediaError = async () => {
+    clearRetryTimer();
+    const status = await probeMediaStatus();
+
+    if (status === 503 && retryCount < MAX_RETRIES) {
+      const nextRetry = retryCount + 1;
+      setRetryCount(nextRetry);
+      setIsRetrying(true);
+      setIsLoading(true);
+      setError(null);
+
+      const delay = RETRY_BASE_DELAY_MS * nextRetry;
+      retryTimeoutRef.current = window.setTimeout(() => {
+        setMediaVersion(prev => prev + 1);
+      }, delay);
+      return;
+    }
+
+    setIsLoading(false);
+    setIsRetrying(false);
+    if (status === 503) {
+      setError('サーバーが一時的に利用できません（503）。しばらくしてから再試行してください。');
+      return;
+    }
+    if (status) {
+      setError(`HTTP ${status}`);
+      return;
+    }
+    setError('ネットワークエラーが発生しました');
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -149,7 +229,11 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
           {isLoading && !error && (
             <div className="text-white text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-              <p>画像を読み込み中...</p>
+              <p>
+                {isRetrying
+                  ? `サーバーが一時的に利用できません（503）。再試行中 (${retryCount}/${MAX_RETRIES})...`
+                  : `${isVideo ? '動画' : '画像'}を読み込み中...`}
+              </p>
             </div>
           )}
           {error && (
@@ -158,11 +242,17 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
                 {isVideo ? '動画' : '画像'}の読み込みに失敗しました
               </p>
               <p className="text-sm text-gray-400">{error}</p>
+              <button
+                onClick={handleManualRetry}
+                className="mt-4 px-4 py-2 text-sm rounded-md bg-gray-800 bg-opacity-70 hover:bg-opacity-90 transition-all"
+              >
+                再試行
+              </button>
             </div>
           )}
           {isVideo ? (
             <video
-              src={imageUrl}
+              src={mediaUrl}
               poster={posterUrl}
               controls
               preload="metadata"
@@ -170,15 +260,14 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
               className="max-w-full max-h-full"
               data-modal-media="true"
               style={{ display: isLoading || error ? 'none' : 'block' }}
-              onLoadedData={() => setIsLoading(false)}
+              onLoadedData={handleMediaLoaded}
               onError={() => {
-                setIsLoading(false);
-                setError('動画の読み込みに失敗しました');
+                void handleMediaError();
               }}
             />
           ) : (
             <img
-              src={imageUrl}
+              src={mediaUrl}
               alt={image.filename}
               className="max-w-full max-h-full object-contain transition-transform duration-200"
               data-modal-media="true"
@@ -186,7 +275,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
                 transform: `scale(${zoom})`,
                 display: isLoading || error ? 'none' : 'block',
               }}
-              onLoad={() => setIsLoading(false)}
+              onLoad={handleMediaLoaded}
               onError={() => {
                 if (!forceVideo && isVideoPath(imageUrl)) {
                   setForceVideo(true);
@@ -194,8 +283,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
                   setError(null);
                   return;
                 }
-                setIsLoading(false);
-                setError('画像の読み込みに失敗しました');
+                void handleMediaError();
               }}
             />
           )}

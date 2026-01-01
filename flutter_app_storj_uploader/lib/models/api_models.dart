@@ -116,21 +116,110 @@ class StatusResponse {
   final bool storjServiceRunning;
   final Map<String, dynamic> statistics;
 
+  // Additional fields from API response
+  final ApiInfo? apiInfo;
+  final StorjStatus? storjStatus;
+
   StatusResponse({
     required this.uploadQueueCount,
     required this.totalUploaded,
     required this.lastUploadTime,
     required this.storjServiceRunning,
     required this.statistics,
+    this.apiInfo,
+    this.storjStatus,
   });
 
   factory StatusResponse.fromJson(Map<String, dynamic> json) {
+    // Parse nested storj_status object
+    final storjStatusJson = json['storj_status'] as Map<String, dynamic>?;
+    final apiInfoJson = json['api_info'] as Map<String, dynamic>?;
+
+    // Debug output
+    print('DEBUG StatusResponse.fromJson: storjStatusJson = $storjStatusJson');
+    print('DEBUG StatusResponse.fromJson: storj_app_available = ${storjStatusJson?['storj_app_available']}');
+
+    // Extract values from nested structure
+    final filesInTarget = storjStatusJson?['files_in_target'] ?? apiInfoJson?['files_in_target'] ?? 0;
+    final filesUploaded = storjStatusJson?['files_uploaded'] ?? 0;
+    final storjAppAvailable = storjStatusJson?['storj_app_available'] ?? false;
+
+    print('DEBUG StatusResponse.fromJson: storjAppAvailable = $storjAppAvailable (type: ${storjAppAvailable.runtimeType})');
+
     return StatusResponse(
-      uploadQueueCount: json['upload_queue_count'] ?? 0,
-      totalUploaded: json['total_uploaded'] ?? 0,
+      uploadQueueCount: filesInTarget is int ? filesInTarget : 0,
+      totalUploaded: filesUploaded is int ? filesUploaded : 0,
       lastUploadTime: json['last_upload_time'] ?? '',
-      storjServiceRunning: json['storj_service_running'] ?? false,
+      storjServiceRunning: storjAppAvailable is bool ? storjAppAvailable : false,
       statistics: json['statistics'] ?? {},
+      apiInfo: apiInfoJson != null ? ApiInfo.fromJson(apiInfoJson) : null,
+      storjStatus: storjStatusJson != null ? StorjStatus.fromJson(storjStatusJson) : null,
+    );
+  }
+}
+
+class ApiInfo {
+  final String uploadTargetDir;
+  final String tempDir;
+  final int filesInTarget;
+  final int filesInTemp;
+  final List<String> supportedImageFormats;
+  final double maxFileSizeMb;
+
+  ApiInfo({
+    required this.uploadTargetDir,
+    required this.tempDir,
+    required this.filesInTarget,
+    required this.filesInTemp,
+    required this.supportedImageFormats,
+    required this.maxFileSizeMb,
+  });
+
+  factory ApiInfo.fromJson(Map<String, dynamic> json) {
+    return ApiInfo(
+      uploadTargetDir: json['upload_target_dir'] ?? '',
+      tempDir: json['temp_dir'] ?? '',
+      filesInTarget: json['files_in_target'] ?? 0,
+      filesInTemp: json['files_in_temp'] ?? 0,
+      supportedImageFormats: (json['supported_image_formats'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList() ?? [],
+      maxFileSizeMb: (json['max_file_size_mb'] ?? 0).toDouble(),
+    );
+  }
+}
+
+class StorjStatus {
+  final bool storjAppAvailable;
+  final String storjAppPath;
+  final String uploadTargetDir;
+  final String uploadedDir;
+  final int filesInTarget;
+  final int filesUploaded;
+  final bool targetDirExists;
+  final bool uploadedDirExists;
+
+  StorjStatus({
+    required this.storjAppAvailable,
+    required this.storjAppPath,
+    required this.uploadTargetDir,
+    required this.uploadedDir,
+    required this.filesInTarget,
+    required this.filesUploaded,
+    required this.targetDirExists,
+    required this.uploadedDirExists,
+  });
+
+  factory StorjStatus.fromJson(Map<String, dynamic> json) {
+    return StorjStatus(
+      storjAppAvailable: json['storj_app_available'] ?? false,
+      storjAppPath: json['storj_app_path'] ?? '',
+      uploadTargetDir: json['upload_target_dir'] ?? '',
+      uploadedDir: json['uploaded_dir'] ?? '',
+      filesInTarget: json['files_in_target'] ?? 0,
+      filesUploaded: json['files_uploaded'] ?? 0,
+      targetDirExists: json['target_dir_exists'] ?? false,
+      uploadedDirExists: json['uploaded_dir_exists'] ?? false,
     );
   }
 }

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_dropzone/flutter_dropzone.dart';
+import 'dart:html' as html;
+import 'dart:js_util' as js_util;
 import '../models/api_models.dart';
 import '../services/file_service.dart';
 import '../utils/constants.dart';
@@ -160,22 +162,38 @@ class _FileUploadAreaState extends State<FileUploadArea>
   Future<void> _onDrop(dynamic event) async {
     if (!widget.isEnabled) return;
 
-    if (_dropzoneController == null) {
-      print('ERROR: _dropzoneController is null in _onDrop');
-      _showErrorSnackBar('File upload controller not initialized');
-      return;
-    }
-
     setState(() {
       _isDragOver = false;
     });
     _animationController.reverse();
 
     try {
-      // Get file info
-      final name = await _dropzoneController!.getFilename(event);
-      final size = await _dropzoneController!.getFileSize(event);
-      final mimeType = await _dropzoneController!.getFileMIME(event);
+      // Handle HTML File object directly (Web platform)
+      if (kIsWeb && event is html.File) {
+        print('DEBUG: Processing HTML File object directly');
+        await _processHtmlFile(event);
+        return;
+      }
+
+      // Fallback to dropzone controller methods
+      if (_dropzoneController == null) {
+        print('ERROR: _dropzoneController is null');
+        _showErrorSnackBar('File upload controller not initialized');
+        return;
+      }
+
+      final controller = _dropzoneController!;
+      print('DEBUG: Using dropzone controller methods');
+
+      final name = await controller.getFilename(event);
+      final size = await controller.getFileSize(event);
+      final mimeType = await controller.getFileMIME(event);
+
+      if (name == null || size == null || mimeType == null) {
+        print('ERROR: Could not get file info');
+        _showErrorSnackBar('Could not get file information');
+        return;
+      }
 
       print('Processing dropped file: $name (${SizeUtils.formatBytes(size)})');
 
@@ -190,29 +208,19 @@ class _FileUploadAreaState extends State<FileUploadArea>
         return;
       }
 
-      // Get file data (bytes) - returns Uint8List
-      print('Getting file data for $name...');
-      final Uint8List? bytes = await _dropzoneController!.getFileData(event);
-
+      // Get file data
+      final bytes = await controller.getFileData(event);
       if (bytes == null) {
-        print('ERROR: getFileData returned null for file: $name');
-        _showErrorSnackBar('Failed to read file data: $name');
+        print('ERROR: getFileData returned null');
+        _showErrorSnackBar('Failed to read file data');
         return;
       }
 
-      print('File data loaded: ${bytes.length} bytes');
-
-      // Create LocalFile using FileService
-      print('Creating LocalFile from bytes...');
+      // Create LocalFile
       final localFile = await FileService().createLocalFileFromBytes(bytes, name);
-
       if (localFile != null) {
-        print('LocalFile created successfully: ${localFile.name}');
         widget.onFilesSelected([localFile]);
         _showSuccessAnimation();
-      } else {
-        print('ERROR: createLocalFileFromBytes returned null for file: $name');
-        _showErrorSnackBar('Failed to process file: $name');
       }
     } catch (e, stackTrace) {
       _showErrorSnackBar('Failed to process dropped file: $e');
@@ -221,14 +229,58 @@ class _FileUploadAreaState extends State<FileUploadArea>
     }
   }
 
+  Future<void> _processHtmlFile(html.File file) async {
+    try {
+      final name = file.name;
+      final size = file.size;
+      final mimeType = file.type;
+
+      print('DEBUG: HTML File - Name: $name, Size: $size, Type: $mimeType');
+
+      // Validate file size
+      final isImage = mimeType.startsWith('image/');
+      final maxSize = isImage ? AppConstants.maxImageSize : AppConstants.maxFileSize;
+
+      if (size > maxSize) {
+        _showErrorSnackBar(
+          'File too large: ${SizeUtils.formatBytes(size)}. Max: ${SizeUtils.formatBytes(maxSize)}'
+        );
+        return;
+      }
+
+      // Read file as bytes
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoadEnd.first;
+
+      if (reader.result == null) {
+        print('ERROR: FileReader result is null');
+        _showErrorSnackBar('Failed to read file');
+        return;
+      }
+
+      final bytes = reader.result as Uint8List;
+      print('DEBUG: File data loaded: ${bytes.length} bytes');
+
+      // Create LocalFile
+      final localFile = await FileService().createLocalFileFromBytes(bytes, name);
+      if (localFile != null) {
+        print('LocalFile created successfully: ${localFile.name}');
+        widget.onFilesSelected([localFile]);
+        _showSuccessAnimation();
+      } else {
+        print('ERROR: createLocalFileFromBytes returned null');
+        _showErrorSnackBar('Failed to process file');
+      }
+    } catch (e, stackTrace) {
+      print('ERROR processing HTML file: $e');
+      print('Stack trace: $stackTrace');
+      _showErrorSnackBar('Failed to process file: $e');
+    }
+  }
+
   Future<void> _onDropMultiple(List<dynamic>? events) async {
     if (!widget.isEnabled || events == null || events.isEmpty) return;
-
-    if (_dropzoneController == null) {
-      print('ERROR: _dropzoneController is null in _onDropMultiple');
-      _showErrorSnackBar('File upload controller not initialized');
-      return;
-    }
 
     setState(() {
       _isDragOver = false;
@@ -241,41 +293,52 @@ class _FileUploadAreaState extends State<FileUploadArea>
 
       for (var event in events) {
         try {
-          final name = await _dropzoneController!.getFilename(event);
-          final size = await _dropzoneController!.getFileSize(event);
-          final mimeType = await _dropzoneController!.getFileMIME(event);
+          // Handle HTML File object directly (Web platform)
+          if (kIsWeb && event is html.File) {
+            print('DEBUG: Processing HTML File object: ${event.name}');
+            final localFile = await _processHtmlFileAndReturn(event);
+            if (localFile != null) {
+              localFiles.add(localFile);
+            }
+            continue;
+          }
 
-          print('Processing file: $name (${SizeUtils.formatBytes(size)})');
+          // Fallback to dropzone controller methods
+          if (_dropzoneController == null) {
+            print('ERROR: _dropzoneController is null, skipping file');
+            continue;
+          }
+
+          final controller = _dropzoneController!;
+          final name = await controller.getFilename(event);
+          final size = await controller.getFileSize(event);
+          final mimeType = await controller.getFileMIME(event);
+
+          if (name == null || size == null || mimeType == null) {
+            print('ERROR: Could not get file info, skipping');
+            continue;
+          }
 
           // Validate file size
           final isImage = mimeType.startsWith('image/');
           final maxSize = isImage ? AppConstants.maxImageSize : AppConstants.maxFileSize;
 
           if (size > maxSize) {
-            print('Skipping file $name: too large (${SizeUtils.formatBytes(size)})');
+            print('Skipping file $name: too large');
             continue;
           }
 
-          // Get file data (bytes) - returns Uint8List
-          print('Getting file data for $name...');
-          final Uint8List? bytes = await _dropzoneController!.getFileData(event);
-
+          // Get file data
+          final bytes = await controller.getFileData(event);
           if (bytes == null) {
-            print('ERROR: getFileData returned null for file: $name');
+            print('ERROR: getFileData returned null for $name');
             continue;
           }
 
-          print('File data loaded for $name: ${bytes.length} bytes');
-
-          // Create LocalFile using FileService
-          print('Creating LocalFile from bytes...');
+          // Create LocalFile
           final localFile = await FileService().createLocalFileFromBytes(bytes, name);
-
           if (localFile != null) {
-            print('LocalFile created: ${localFile.name}');
             localFiles.add(localFile);
-          } else {
-            print('ERROR: createLocalFileFromBytes returned null for file: $name');
           }
         } catch (e, stackTrace) {
           print('Error processing file: $e');
@@ -294,6 +357,39 @@ class _FileUploadAreaState extends State<FileUploadArea>
       _showErrorSnackBar('Failed to process dropped files: $e');
       print('Drop multiple error: $e');
       print('Stack trace: $stackTrace');
+    }
+  }
+
+  Future<LocalFile?> _processHtmlFileAndReturn(html.File file) async {
+    try {
+      final name = file.name;
+      final size = file.size;
+      final mimeType = file.type;
+
+      // Validate file size
+      final isImage = mimeType.startsWith('image/');
+      final maxSize = isImage ? AppConstants.maxImageSize : AppConstants.maxFileSize;
+
+      if (size > maxSize) {
+        print('Skipping file $name: too large');
+        return null;
+      }
+
+      // Read file as bytes
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoadEnd.first;
+
+      if (reader.result == null) {
+        print('ERROR: FileReader result is null for $name');
+        return null;
+      }
+
+      final bytes = reader.result as Uint8List;
+      return await FileService().createLocalFileFromBytes(bytes, name);
+    } catch (e) {
+      print('ERROR processing HTML file: $e');
+      return null;
     }
   }
 
