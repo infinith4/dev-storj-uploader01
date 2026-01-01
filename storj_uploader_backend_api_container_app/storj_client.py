@@ -283,6 +283,83 @@ class StorjClient:
                 "storj_app_available": False
             }
 
+    def _list_blob_images(
+        self,
+        container_name: str,
+        limit: int,
+        offset: int,
+        base_url: Optional[str]
+    ) -> Tuple[bool, list, str]:
+        if not self.blob_helper:
+            return False, [], "Blob Storage not available"
+
+        try:
+            blobs = self.blob_helper.list_blobs_with_properties(
+                container_name=container_name
+            )
+
+            images = []
+            thumbnails = {}
+            image_extensions = ('.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.tiff', '.gif')
+            video_extensions = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.3gp', '.flv', '.wmv')
+
+            all_files = []
+            for blob in blobs:
+                path = blob.get("name", "")
+                size = blob.get("size", 0) or 0
+                mod_time = blob.get("last_modified", "") or ""
+                if not path:
+                    continue
+
+                filename = path.split('/')[-1]
+
+                if '_thumb_' in filename.lower() or filename.lower().endswith('_thumb.jpg'):
+                    thumb_index = filename.lower().find('_thumb')
+                    if thumb_index > 0:
+                        video_stem = filename[:thumb_index]
+                        thumbnails[video_stem.lower()] = path
+
+                if path.lower().endswith(image_extensions) or path.lower().endswith(video_extensions):
+                    all_files.append((path, size, mod_time))
+
+            api_base_url = (base_url or os.getenv("API_BASE_URL") or "http://localhost:8010").rstrip("/")
+
+            for path, size, mod_time in all_files:
+                filename = path.split('/')[-1]
+                if '_thumb_' in filename.lower() or filename.lower().endswith('_thumb.jpg'):
+                    continue
+
+                is_video = path.lower().endswith(video_extensions)
+                full_url = f"{api_base_url}/storj/images/{path}?thumbnail=false"
+
+                if is_video:
+                    file_stem = filename.rsplit('.', 1)[0]
+                    thumbnail_path = thumbnails.get(file_stem.lower())
+                    if thumbnail_path:
+                        thumbnail_url = f"{api_base_url}/storj/images/{thumbnail_path}?thumbnail=false"
+                    else:
+                        thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
+                else:
+                    thumbnail_url = f"{api_base_url}/storj/images/{path}?thumbnail=true"
+
+                images.append({
+                    "filename": filename,
+                    "path": path,
+                    "size": size,
+                    "modified_time": mod_time,
+                    "thumbnail_url": thumbnail_url,
+                    "url": full_url,
+                    "is_video": is_video
+                })
+
+            total_count = len(images)
+            paginated_images = images[offset:offset + limit]
+            return True, paginated_images, f"Successfully retrieved {len(paginated_images)} images"
+
+        except Exception as e:
+            print(f"Error listing Blob images: {str(e)}")
+            return False, [], str(e)
+
     def list_storj_images(
         self,
         bucket_name: str = None,
@@ -295,6 +372,16 @@ class StorjClient:
         Returns: (success: bool, images: list, error_message: str)
         """
         try:
+            gallery_source = os.getenv("GALLERY_SOURCE", "").lower()
+            if gallery_source in ("azure", "blob", "storage"):
+                container_name = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+                return self._list_blob_images(
+                    container_name=container_name,
+                    limit=limit,
+                    offset=offset,
+                    base_url=base_url
+                )
+
             # .envから設定を取得
             if bucket_name is None:
                 bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")

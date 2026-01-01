@@ -153,6 +153,92 @@ def _generate_video_thumbnail(
         if temp_thumb and temp_thumb.exists():
             temp_thumb.unlink()
 
+def _generate_image_thumbnail(image_data: bytes, size=(300, 300)) -> tuple:
+    try:
+        with Image.open(io.BytesIO(image_data)) as img:
+            img.thumbnail(size)
+            output = io.BytesIO()
+            img.convert("RGB").save(output, format="JPEG", quality=85)
+        return True, output.getvalue(), "Success"
+    except Exception as e:
+        return False, b"", str(e)
+
+def _generate_video_thumbnail_from_blob(
+    blob_name: str,
+    container: str,
+    width: int = 320,
+    height: int = 240
+) -> tuple:
+    if not blob_helper:
+        return False, b"", "Blob Storage not available"
+
+    cache_dir = Path(__file__).parent / "thumbnail_cache"
+    cache_dir.mkdir(exist_ok=True)
+    cache_filename = blob_name.replace("/", "_").replace("\\", "_")
+    cache_path = cache_dir / cache_filename
+
+    if cache_path.exists() and cache_path.stat().st_size > 0:
+        return True, cache_path.read_bytes(), "Success (cached)"
+
+    temp_dir = Path(os.getenv("TEMP_DIR", "./temp"))
+    temp_dir.mkdir(exist_ok=True, parents=True)
+
+    temp_video = None
+    temp_thumb = None
+    try:
+        video_data = blob_helper.download_blob_to_bytes(
+            blob_name=blob_name,
+            container_name=container
+        )
+        if not video_data:
+            return False, b"", "Failed to download video"
+
+        with tempfile.NamedTemporaryFile(
+            dir=temp_dir,
+            suffix=Path(blob_name).suffix or ".mp4",
+            delete=False
+        ) as temp_file:
+            temp_video = Path(temp_file.name)
+            temp_file.write(video_data)
+
+        temp_thumb = temp_dir / f"{uuid.uuid4().hex}_thumb.jpg"
+
+        generated = VideoProcessor.generate_thumbnail(
+            str(temp_video),
+            str(temp_thumb),
+            width=width,
+            height=height,
+            method="ffmpeg"
+        )
+
+        if not generated or not temp_thumb.exists():
+            return False, b"", "Failed to generate video thumbnail"
+
+        thumb_data = temp_thumb.read_bytes()
+        if not thumb_data:
+            return False, b"", "Generated thumbnail is empty"
+
+        temp_cache_path = cache_path.with_name(cache_path.name + ".tmp")
+        with open(temp_cache_path, "wb") as cache_file:
+            cache_file.write(thumb_data)
+        temp_cache_path.replace(cache_path)
+
+        try:
+            blob_helper.upload_file(
+                str(temp_thumb),
+                blob_name=f"{Path(blob_name).with_suffix('')}_thumb.jpg",
+                container_name=container
+            )
+        except Exception as upload_error:
+            print(f"Failed to upload generated thumbnail: {upload_error}")
+
+        return True, thumb_data, "Success (generated)"
+    finally:
+        if temp_video and temp_video.exists():
+            temp_video.unlink()
+        if temp_thumb and temp_thumb.exists():
+            temp_thumb.unlink()
+
 try:
     from blob_storage import BlobStorageHelper
     BLOB_STORAGE_AVAILABLE = True
