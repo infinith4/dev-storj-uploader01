@@ -257,7 +257,16 @@ class ApiService {
           'offset': offset,
         },
       );
-      return StorjImageListResponse.fromJson(response.data);
+      if (response.data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Invalid gallery response');
+      }
+      final parsed = StorjImageListResponse.fromJson(response.data);
+      if (!parsed.success) {
+        throw ApiException(
+          message: parsed.message ?? 'Failed to load gallery',
+        );
+      }
+      return parsed;
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
     }

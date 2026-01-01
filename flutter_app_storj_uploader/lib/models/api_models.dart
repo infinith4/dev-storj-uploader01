@@ -360,12 +360,16 @@ class StorjImageItem {
 
 // Storj Image List Response
 class StorjImageListResponse {
+  final bool success;
+  final String? message;
   final List<StorjImageItem> images;
   final int total;
   final int limit;
   final int offset;
 
   StorjImageListResponse({
+    required this.success,
+    this.message,
     required this.images,
     required this.total,
     required this.limit,
@@ -373,12 +377,17 @@ class StorjImageListResponse {
   });
 
   factory StorjImageListResponse.fromJson(Map<String, dynamic> json) {
+    final images = (json['images'] as List<dynamic>?)
+            ?.map((item) => StorjImageItem.fromJson(item as Map<String, dynamic>))
+            .toList() ??
+        [];
+    final totalCount = json['total_count'] ?? json['total'] ?? 0;
     return StorjImageListResponse(
-      images: (json['images'] as List<dynamic>?)
-          ?.map((item) => StorjImageItem.fromJson(item as Map<String, dynamic>))
-          .toList() ?? [],
-      total: json['total'] ?? 0,
-      limit: json['limit'] ?? 100,
+      success: json['success'] ?? true,
+      message: json['message'],
+      images: images,
+      total: totalCount is int ? totalCount : 0,
+      limit: json['limit'] ?? images.length,
       offset: json['offset'] ?? 0,
     );
   }

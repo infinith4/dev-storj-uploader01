@@ -832,16 +832,19 @@ async def trigger_upload_async():
 async def get_storj_images(
     limit: int = 100,
     offset: int = 0,
-    bucket: str = None
+    bucket: str = None,
+    request: Request = None
 ):
     """
     Storjに保存されている画像リストを取得
     """
     try:
+        base_url = str(request.base_url).rstrip("/") if request else None
         success, images, message = storj_client.list_storj_images(
             bucket_name=bucket,
             limit=limit,
-            offset=offset
+            offset=offset,
+            base_url=base_url
         )
 
         if not success:
