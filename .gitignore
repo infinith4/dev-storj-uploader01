@@ -14,8 +14,8 @@ rclone.conf
 storj_local_structure
 venv
 /AZURE_ENV_SECRET.md
-/.azure
+.azure
 /storj_uploader_frontend_container_app/.azure
-/storj_uploader_frontend_container_app/.azure_cfg/commands/*.log
 /storj_uploader_frontend_container_app/.azure_cfg
 /storj_container_app/rclone - コピー.conf
+*.log
