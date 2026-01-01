@@ -58,9 +58,18 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
   };
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
+    const target = e.target as Element | null;
+    if (!target) {
       onClose();
+      return;
     }
+    if (target.closest('[data-modal-media="true"]')) {
+      return;
+    }
+    if (target.closest('[data-modal-controls="true"]')) {
+      return;
+    }
+    onClose();
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -98,7 +107,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
                 {formatFileSize(image.size)} • {formatDate(image.modified_time)}
               </p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2" data-modal-controls="true">
               {!isVideo && (
                 <>
                   <button
@@ -159,6 +168,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
               preload="metadata"
               playsInline
               className="max-w-full max-h-full"
+              data-modal-media="true"
               style={{ display: isLoading || error ? 'none' : 'block' }}
               onLoadedData={() => setIsLoading(false)}
               onError={() => {
@@ -171,6 +181,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ image, isOpen, onClose }) => {
               src={imageUrl}
               alt={image.filename}
               className="max-w-full max-h-full object-contain transition-transform duration-200"
+              data-modal-media="true"
               style={{
                 transform: `scale(${zoom})`,
                 display: isLoading || error ? 'none' : 'block',
