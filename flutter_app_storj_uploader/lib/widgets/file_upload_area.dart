@@ -181,60 +181,58 @@ class _FileUploadAreaState extends State<FileUploadArea>
       }
 
       print('DEBUG: Getting filename...');
-      dynamic nameResult;
+      String? name;
+      int? size;
+      String? mimeType;
+
       try {
-        nameResult = await controller.getFilename(event);
+        name = await controller.getFilename(event);
+        print('DEBUG: Filename result: $name');
       } catch (e) {
         print('ERROR: Exception in getFilename: $e');
-        _showErrorSnackBar('Failed to get file name');
+        _showErrorSnackBar('Failed to get file name: $e');
         return;
       }
 
-      final String name;
-      if (nameResult == null || nameResult.toString().isEmpty) {
-        print('ERROR: getFilename returned null or empty: $nameResult');
+      if (name == null || name.isEmpty) {
+        print('ERROR: getFilename returned null or empty');
         _showErrorSnackBar('Could not get file name');
         return;
       }
-      name = nameResult.toString();
       print('DEBUG: Filename: $name');
 
       print('DEBUG: Getting file size...');
-      dynamic sizeResult;
       try {
-        sizeResult = await controller.getFileSize(event);
+        size = await controller.getFileSize(event);
+        print('DEBUG: Size result: $size');
       } catch (e) {
         print('ERROR: Exception in getFileSize: $e');
-        _showErrorSnackBar('Failed to get file size');
+        _showErrorSnackBar('Failed to get file size: $e');
         return;
       }
 
-      final int size;
-      if (sizeResult == null) {
+      if (size == null) {
         print('ERROR: getFileSize returned null');
         _showErrorSnackBar('Could not get file size');
         return;
       }
-      size = sizeResult is int ? sizeResult : int.parse(sizeResult.toString());
       print('DEBUG: File size: $size');
 
       print('DEBUG: Getting MIME type...');
-      dynamic mimeResult;
       try {
-        mimeResult = await controller.getFileMIME(event);
+        mimeType = await controller.getFileMIME(event);
+        print('DEBUG: MIME type result: $mimeType');
       } catch (e) {
         print('ERROR: Exception in getFileMIME: $e');
-        _showErrorSnackBar('Failed to get file type');
+        _showErrorSnackBar('Failed to get file type: $e');
         return;
       }
 
-      final String mimeType;
-      if (mimeResult == null || mimeResult.toString().isEmpty) {
-        print('ERROR: getFileMIME returned null or empty: $mimeResult');
+      if (mimeType == null || mimeType.isEmpty) {
+        print('ERROR: getFileMIME returned null or empty');
         _showErrorSnackBar('Could not get file type');
         return;
       }
-      mimeType = mimeResult.toString();
       print('DEBUG: MIME type: $mimeType');
 
       print('Processing dropped file: $name (${SizeUtils.formatBytes(size)})');
@@ -310,52 +308,50 @@ class _FileUploadAreaState extends State<FileUploadArea>
         try {
           print('DEBUG: Processing individual file from multiple drop...');
 
-          dynamic nameResult;
+          String? name;
+          int? size;
+          String? mimeType;
+
           try {
-            nameResult = await controller.getFilename(event);
+            name = await controller.getFilename(event);
+            print('DEBUG: Filename result: $name');
           } catch (e) {
             print('ERROR: Exception in getFilename: $e');
             continue;
           }
 
-          final String name;
-          if (nameResult == null || nameResult.toString().isEmpty) {
-            print('ERROR: getFilename returned null or empty for one file: $nameResult');
+          if (name == null || name.isEmpty) {
+            print('ERROR: getFilename returned null or empty for one file');
             continue;
           }
-          name = nameResult.toString();
           print('DEBUG: Filename: $name');
 
-          dynamic sizeResult;
           try {
-            sizeResult = await controller.getFileSize(event);
+            size = await controller.getFileSize(event);
+            print('DEBUG: Size result for $name: $size');
           } catch (e) {
             print('ERROR: Exception in getFileSize for $name: $e');
             continue;
           }
 
-          final int size;
-          if (sizeResult == null) {
+          if (size == null) {
             print('ERROR: getFileSize returned null for file: $name');
             continue;
           }
-          size = sizeResult is int ? sizeResult : int.parse(sizeResult.toString());
           print('DEBUG: File size for $name: $size');
 
-          dynamic mimeResult;
           try {
-            mimeResult = await controller.getFileMIME(event);
+            mimeType = await controller.getFileMIME(event);
+            print('DEBUG: MIME type result for $name: $mimeType');
           } catch (e) {
             print('ERROR: Exception in getFileMIME for $name: $e');
             continue;
           }
 
-          final String mimeType;
-          if (mimeResult == null || mimeResult.toString().isEmpty) {
-            print('ERROR: getFileMIME returned null or empty for file: $name - $mimeResult');
+          if (mimeType == null || mimeType.isEmpty) {
+            print('ERROR: getFileMIME returned null or empty for file: $name');
             continue;
           }
-          mimeType = mimeResult.toString();
           print('DEBUG: MIME type for $name: $mimeType');
 
           print('Processing file: $name (${SizeUtils.formatBytes(size)})');
