@@ -30,6 +30,13 @@ class _FileUploadAreaState extends State<FileUploadArea>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   DropzoneViewController? _dropzoneController;
+  bool _dropInProgress = false;
+
+  void _scheduleDropReset() {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _dropInProgress = false;
+    });
+  }
 
   @override
   void initState() {
@@ -161,6 +168,8 @@ class _FileUploadAreaState extends State<FileUploadArea>
 
   Future<void> _onDrop(dynamic event) async {
     if (!widget.isEnabled) return;
+    if (_dropInProgress) return;
+    _dropInProgress = true;
 
     setState(() {
       _isDragOver = false;
@@ -226,6 +235,8 @@ class _FileUploadAreaState extends State<FileUploadArea>
       _showErrorSnackBar('Failed to process dropped file: $e');
       print('Drop error: $e');
       print('Stack trace: $stackTrace');
+    } finally {
+      _scheduleDropReset();
     }
   }
 
@@ -281,6 +292,8 @@ class _FileUploadAreaState extends State<FileUploadArea>
 
   Future<void> _onDropMultiple(List<dynamic>? events) async {
     if (!widget.isEnabled || events == null || events.isEmpty) return;
+    if (_dropInProgress) return;
+    _dropInProgress = true;
 
     setState(() {
       _isDragOver = false;
@@ -357,6 +370,8 @@ class _FileUploadAreaState extends State<FileUploadArea>
       _showErrorSnackBar('Failed to process dropped files: $e');
       print('Drop multiple error: $e');
       print('Stack trace: $stackTrace');
+    } finally {
+      _scheduleDropReset();
     }
   }
 
