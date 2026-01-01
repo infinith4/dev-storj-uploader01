@@ -27,6 +27,9 @@ param storageAccountName string
 @secure()
 param storageAccountKey string
 
+// Construct connection string for KEDA scaler
+var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccountKey};EndpointSuffix=core.windows.net'
+
 @description('Storj Bucket Name')
 param storjBucketName string
 
@@ -62,6 +65,10 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'storage-key'
           value: storageAccountKey
+        }
+        {
+          name: 'storage-connection-string'
+          value: storageConnectionString
         }
       ], useKeyVault && !empty(keyVaultUri) ? [
         {
@@ -155,8 +162,26 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
-        maxReplicas: 1
+        minReplicas: 0
+        maxReplicas: 5
+        rules: [
+          {
+            name: 'blob-scaling'
+            custom: {
+              type: 'azure-blob'
+              metadata: {
+                blobContainerName: 'upload-target'
+                blobCount: '5'
+              }
+              auth: [
+                {
+                  secretRef: 'storage-connection-string'
+                  triggerParameter: 'connection'
+                }
+              ]
+            }
+          }
+        ]
       }
       volumes: [
         {
