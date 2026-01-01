@@ -166,10 +166,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
+            Tab(icon: Icon(Icons.photo_library), text: 'Gallery'),
             Tab(icon: Icon(Icons.upload), text: 'Upload'),
             Tab(icon: Icon(Icons.queue), text: 'Queue'),
             Tab(icon: Icon(Icons.info), text: 'Status'),
-            Tab(icon: Icon(Icons.photo_library), text: 'Gallery'),
           ],
         ),
       ),
