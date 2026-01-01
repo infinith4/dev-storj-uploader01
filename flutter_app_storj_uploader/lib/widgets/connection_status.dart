@@ -120,12 +120,26 @@ class _ConnectionStatusState extends State<ConnectionStatus>
               ),
               const SizedBox(width: UIConstants.smallPadding),
               Expanded(
-                child: Text(
-                  'Connected to server',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Connected to server',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      ApiConstants.defaultBaseUrl,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 10,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
               Container(
@@ -192,9 +206,19 @@ class _ConnectionStatusState extends State<ConnectionStatus>
                               ),
                             ),
                             Text(
-                              'Check your connection and try again',
+                              'Trying to connect to: ${ApiConstants.defaultBaseUrl}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.white.withOpacity(0.9),
+                                fontSize: 10,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Check your connection and try again',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withOpacity(0.8),
                               ),
                             ),
                           ],

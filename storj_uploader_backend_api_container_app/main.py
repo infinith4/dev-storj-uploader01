@@ -239,9 +239,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:9010",
-        "http://localhost:3000",  # 開発環境
+        "http://localhost:3000",  # 開発環境 (React)
+        "http://localhost:8080",  # 開発環境 (Flutter)
         "http://127.0.0.1:9010",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
+        # Azure Container Apps URLs
+        "https://stjup2-frontend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io",
+        "https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
