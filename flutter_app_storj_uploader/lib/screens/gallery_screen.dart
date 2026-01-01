@@ -191,6 +191,88 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
+  Widget _buildHeader() {
+    final videoCount = _images.where((item) => item.isVideo).length;
+    final imageCount = _images.length - videoCount;
+
+    return Padding(
+      padding: const EdgeInsets.all(UIConstants.smallPadding),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: UIConstants.smallPadding,
+        runSpacing: UIConstants.smallPadding,
+        children: [
+          Text(
+            '$imageCount images • $videoCount videos • ${_images.length} total',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'ソート',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(width: UIConstants.smallPadding),
+              PopupMenuButton<GallerySortOption>(
+                tooltip: 'ソート',
+                initialValue: _sortOption,
+                onSelected: (value) {
+                  setState(() {
+                    _sortOption = value;
+                    _images = _sortImages(_images);
+                  });
+                },
+                itemBuilder: (context) {
+                  return GallerySortOption.values.map((option) {
+                    return CheckedPopupMenuItem<GallerySortOption>(
+                      value: option,
+                      checked: option == _sortOption,
+                      child: Text(_sortOptionLabel(option)),
+                    );
+                  }).toList();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _sortOptionLabel(_sortOption),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.expand_more,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadImages,
+                tooltip: 'Refresh',
+                iconSize: 20,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -200,157 +282,93 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
 
     if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(UIConstants.defaultPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Theme.of(context).colorScheme.error,
+      return Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(UIConstants.defaultPadding),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: UIConstants.defaultPadding),
+                    Text(
+                      'Failed to load gallery',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: UIConstants.smallPadding),
+                    Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: UIConstants.defaultPadding),
+                    ElevatedButton.icon(
+                      onPressed: _loadImages,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: UIConstants.defaultPadding),
-              Text(
-                'Failed to load gallery',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: UIConstants.smallPadding),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: UIConstants.defaultPadding),
-              ElevatedButton.icon(
-                onPressed: _loadImages,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       );
     }
 
     if (_images.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.photo_library_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: UIConstants.defaultPadding),
-            Text(
-              'No images or videos found',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: UIConstants.smallPadding),
-            Text(
-              'Upload files to see them here',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+      return Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 64,
                     color: Theme.of(context).colorScheme.outline,
                   ),
+                  const SizedBox(height: UIConstants.defaultPadding),
+                  Text(
+                    'No images or videos found',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: UIConstants.smallPadding),
+                  Text(
+                    'Upload files to see them here',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                  const SizedBox(height: UIConstants.defaultPadding),
+                  ElevatedButton.icon(
+                    onPressed: _loadImages,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Refresh'),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: UIConstants.defaultPadding),
-            ElevatedButton.icon(
-              onPressed: _loadImages,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Refresh'),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
-
-    final videoCount = _images.where((item) => item.isVideo).length;
-    final imageCount = _images.length - videoCount;
 
     return RefreshIndicator(
       onRefresh: _loadImages,
       child: Column(
         children: [
           // Header with count
-          Padding(
-            padding: const EdgeInsets.all(UIConstants.smallPadding),
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: UIConstants.smallPadding,
-              runSpacing: UIConstants.smallPadding,
-              children: [
-                Text(
-                  '$imageCount images • $videoCount videos • ${_images.length} total',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'ソート',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(width: UIConstants.smallPadding),
-                    PopupMenuButton<GallerySortOption>(
-                      tooltip: 'ソート',
-                      initialValue: _sortOption,
-                      onSelected: (value) {
-                        setState(() {
-                          _sortOption = value;
-                          _images = _sortImages(_images);
-                        });
-                      },
-                      itemBuilder: (context) {
-                        return GallerySortOption.values.map((option) {
-                          return CheckedPopupMenuItem<GallerySortOption>(
-                            value: option,
-                            checked: option == _sortOption,
-                            child: Text(_sortOptionLabel(option)),
-                          );
-                        }).toList();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _sortOptionLabel(_sortOption),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.expand_more,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _loadImages,
-                      tooltip: 'Refresh',
-                      iconSize: 20,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          _buildHeader(),
           // Grid
           Expanded(
             child: GridView.builder(
