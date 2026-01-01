@@ -5,6 +5,11 @@ import '../services/api_service.dart';
 import '../utils/constants.dart';
 import 'media_viewer_screen.dart';
 
+enum GallerySortOption {
+  capturedDate,
+  uploadedDate,
+}
+
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
 
@@ -21,6 +26,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   static const int _pageSize = 50;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+  GallerySortOption _sortOption = GallerySortOption.capturedDate;
 
   @override
   void initState() {
@@ -58,7 +64,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
       if (mounted) {
         setState(() {
-          _images = response.images;
+          _images = _sortImages(response.images);
           _currentOffset = response.images.length;
           _hasMore = response.images.length >= _pageSize;
           _isLoading = false;
@@ -89,7 +95,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
       if (mounted) {
         setState(() {
-          _images.addAll(response.images);
+          final combined = List<StorjImageItem>.from(_images)
+            ..addAll(response.images);
+          _images = _sortImages(combined);
           _currentOffset += response.images.length;
           _hasMore = response.images.length >= _pageSize;
           _isLoadingMore = false;
@@ -113,6 +121,65 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ),
       ),
     );
+  }
+
+  List<StorjImageItem> _sortImages(List<StorjImageItem> items) {
+    final sorted = List<StorjImageItem>.from(items);
+    sorted.sort((a, b) {
+      final aDate = _sortOption == GallerySortOption.capturedDate
+          ? _resolveCapturedDate(a)
+          : _resolveUploadedDate(a);
+      final bDate = _sortOption == GallerySortOption.capturedDate
+          ? _resolveCapturedDate(b)
+          : _resolveUploadedDate(b);
+      return bDate.compareTo(aDate);
+    });
+    return sorted;
+  }
+
+  DateTime _resolveUploadedDate(StorjImageItem item) {
+    return _parseModifiedTime(item.modifiedTime) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  DateTime _resolveCapturedDate(StorjImageItem item) {
+    return _extractDateTime(item.filename) ??
+        _extractDateTime(item.path) ??
+        _parseModifiedTime(item.modifiedTime) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  DateTime? _parseModifiedTime(String value) {
+    if (value.isEmpty) return null;
+    final normalized = value.replaceFirst(' ', 'T');
+    return DateTime.tryParse(normalized);
+  }
+
+  DateTime? _extractDateTime(String value) {
+    final dateTimeMatch = RegExp(
+      r'(20\d{2})(\d{2})(\d{2})[T_\-]?(\d{2})(\d{2})(\d{2})',
+    ).firstMatch(value);
+    if (dateTimeMatch != null) {
+      return DateTime(
+        int.parse(dateTimeMatch.group(1)!),
+        int.parse(dateTimeMatch.group(2)!),
+        int.parse(dateTimeMatch.group(3)!),
+        int.parse(dateTimeMatch.group(4)!),
+        int.parse(dateTimeMatch.group(5)!),
+        int.parse(dateTimeMatch.group(6)!),
+      );
+    }
+
+    final dateMatch = RegExp(r'(20\d{2})(\d{2})(\d{2})').firstMatch(value);
+    if (dateMatch != null) {
+      return DateTime(
+        int.parse(dateMatch.group(1)!),
+        int.parse(dateMatch.group(2)!),
+        int.parse(dateMatch.group(3)!),
+      );
+    }
+
+    return null;
   }
 
   @override
@@ -205,11 +272,36 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   '${_images.length} items',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _loadImages,
-                  tooltip: 'Refresh',
-                  iconSize: 20,
+                Row(
+                  children: [
+                    DropdownButton<GallerySortOption>(
+                      value: _sortOption,
+                      underline: const SizedBox.shrink(),
+                      items: const [
+                        DropdownMenuItem(
+                          value: GallerySortOption.capturedDate,
+                          child: Text('Captured date'),
+                        ),
+                        DropdownMenuItem(
+                          value: GallerySortOption.uploadedDate,
+                          child: Text('Uploaded date'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _sortOption = value;
+                          _images = _sortImages(_images);
+                        });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _loadImages,
+                      tooltip: 'Refresh',
+                      iconSize: 20,
+                    ),
+                  ],
                 ),
               ],
             ),
