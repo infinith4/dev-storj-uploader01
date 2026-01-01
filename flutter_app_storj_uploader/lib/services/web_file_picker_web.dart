@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:html' as html;
+export 'web_file_picker_stub.dart' show WebPickedFile;
 import 'web_file_picker_stub.dart';
 
 Future<List<WebPickedFile>> pickWebFiles({

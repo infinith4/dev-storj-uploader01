@@ -14,7 +14,9 @@ Future<Map<String, dynamic>> uploadBrowserFile({
   if (onSendProgress != null) {
     request.upload.onProgress.listen((event) {
       if (event.lengthComputable) {
-        onSendProgress(event.loaded, event.total);
+        final loaded = event.loaded ?? 0;
+        final total = event.total ?? 0;
+        onSendProgress(loaded, total);
       }
     });
   }
