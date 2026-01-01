@@ -102,6 +102,37 @@ class BlobStorageHelper:
 
         return [blob.name for blob in blobs]
 
+    def list_blobs_with_properties(
+        self,
+        container_name: Optional[str] = None,
+        prefix: Optional[str] = None
+    ) -> List[dict]:
+        """
+        List blobs with properties in a container.
+
+        Returns:
+            List of dicts with name, size, last_modified
+        """
+        if container_name is None:
+            container_name = self.upload_container
+
+        container_client = self.blob_service_client.get_container_client(container_name)
+
+        if prefix:
+            blobs = container_client.list_blobs(name_starts_with=prefix)
+        else:
+            blobs = container_client.list_blobs()
+
+        results = []
+        for blob in blobs:
+            last_modified = blob.last_modified.isoformat() if blob.last_modified else ""
+            results.append({
+                "name": blob.name,
+                "size": blob.size or 0,
+                "last_modified": last_modified
+            })
+        return results
+
     def delete_blob(self, blob_name: str, container_name: Optional[str] = None):
         """
         Delete a blob from storage.
@@ -119,6 +150,68 @@ class BlobStorageHelper:
         )
 
         blob_client.delete_blob()
+
+    def get_blob_properties(self, blob_name: str, container_name: Optional[str] = None) -> dict:
+        """
+        Get blob properties.
+        """
+        if container_name is None:
+            container_name = self.upload_container
+
+        blob_client = self.blob_service_client.get_blob_client(
+            container=container_name,
+            blob=blob_name
+        )
+        props = blob_client.get_blob_properties()
+        content_type = ""
+        if props.content_settings and props.content_settings.content_type:
+            content_type = props.content_settings.content_type
+        last_modified = props.last_modified.isoformat() if props.last_modified else ""
+        return {
+            "size": props.size,
+            "content_type": content_type,
+            "last_modified": last_modified
+        }
+
+    def download_blob_to_bytes(
+        self,
+        blob_name: str,
+        container_name: Optional[str] = None,
+        offset: Optional[int] = None,
+        length: Optional[int] = None
+    ) -> bytes:
+        """
+        Download blob contents into memory.
+        """
+        if container_name is None:
+            container_name = self.upload_container
+
+        blob_client = self.blob_service_client.get_blob_client(
+            container=container_name,
+            blob=blob_name
+        )
+        return blob_client.download_blob(offset=offset, length=length).readall()
+
+    def stream_blob(
+        self,
+        blob_name: str,
+        container_name: Optional[str] = None,
+        offset: Optional[int] = None,
+        length: Optional[int] = None,
+        chunk_size: int = 4 * 1024 * 1024
+    ):
+        """
+        Stream blob contents in chunks.
+        """
+        if container_name is None:
+            container_name = self.upload_container
+
+        blob_client = self.blob_service_client.get_blob_client(
+            container=container_name,
+            blob=blob_name
+        )
+        downloader = blob_client.download_blob(offset=offset, length=length)
+        return downloader.chunks(chunk_size=chunk_size)
 
     def move_blob(self, blob_name: str, source_container: Optional[str] = None, dest_container: Optional[str] = None):
         """
