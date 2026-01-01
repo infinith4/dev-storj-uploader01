@@ -224,9 +224,14 @@ def _generate_video_thumbnail_from_blob(
         temp_cache_path.replace(cache_path)
 
         try:
+            # Upload thumbnail to thumbnails/YYYYMM/ directory
+            path_obj = Path(blob_name)
+            dir_name = path_obj.parent.name  # YYYYMM
+            file_stem = path_obj.stem  # filename without extension
+            thumb_blob_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
             blob_helper.upload_file(
                 str(temp_thumb),
-                blob_name=f"{Path(blob_name).with_suffix('')}_thumb.jpg",
+                blob_name=thumb_blob_path,
                 container_name=container
             )
         except Exception as upload_error:
@@ -1094,7 +1099,11 @@ async def get_storj_image(
 
             if thumbnail:
                 if is_video:
-                    thumbnail_path = f"{Path(image_path).with_suffix('')}_thumb.jpg"
+                    # Thumbnail is in thumbnails/YYYYMM/ directory
+                    path_obj = Path(image_path)
+                    dir_name = path_obj.parent.name  # YYYYMM
+                    file_stem = path_obj.stem  # filename without extension
+                    thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
                     if blob_helper.blob_exists(
                         thumbnail_path,
                         container_name=container_name
@@ -1208,7 +1217,11 @@ async def get_storj_image(
         # サムネイルまたはフルサイズ画像を取得
         if thumbnail:
             if is_video:
-                thumbnail_path = f"{Path(image_path).with_suffix('')}_thumb.jpg"
+                # Thumbnail is in thumbnails/YYYYMM/ directory
+                path_obj = Path(image_path)
+                dir_name = path_obj.parent.name  # YYYYMM
+                file_stem = path_obj.stem  # filename without extension
+                thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
                 success, image_data, error_msg = storj_client.get_storj_image(
                     image_path=thumbnail_path,
                     bucket_name=bucket

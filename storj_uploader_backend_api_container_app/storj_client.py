@@ -617,7 +617,11 @@ class StorjClient:
             deleted.append(path)
 
             if self._is_video_path(path):
-                thumb_path = f"{Path(path).with_suffix('')}_thumb.jpg"
+                # Thumbnail is in thumbnails/YYYYMM/ directory
+                path_obj = Path(path)
+                dir_name = path_obj.parent.name  # YYYYMM
+                file_stem = path_obj.stem  # filename without extension
+                thumb_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
                 thumb_remote_path = f"{remote_name}:{bucket_name}/{thumb_path}"
                 thumb_cmd = ["rclone", "deletefile", thumb_remote_path]
                 thumb_result = subprocess.run(
