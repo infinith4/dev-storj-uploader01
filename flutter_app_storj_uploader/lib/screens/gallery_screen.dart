@@ -27,6 +27,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
   bool _hasMore = true;
   bool _isLoadingMore = false;
   GallerySortOption _sortOption = GallerySortOption.capturedDate;
+  bool _isSelectionMode = false;
+  final Set<String> _selectedPaths = {};
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -123,6 +126,112 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
+  void _setSelectionMode(bool enabled) {
+    setState(() {
+      _isSelectionMode = enabled;
+      if (!enabled) {
+        _selectedPaths.clear();
+      }
+    });
+  }
+
+  void _toggleSelection(StorjImageItem item) {
+    setState(() {
+      if (_selectedPaths.contains(item.path)) {
+        _selectedPaths.remove(item.path);
+      } else {
+        _selectedPaths.add(item.path);
+      }
+    });
+  }
+
+  Future<void> _confirmDeleteSelected() async {
+    if (_selectedPaths.isEmpty || _isDeleting) return;
+
+    final count = _selectedPaths.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('削除の確認'),
+          content: Text('$count 件のメディアを削除しますか？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('削除'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deleteSelected();
+    }
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedPaths.isEmpty) return;
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      final response = await ApiService().deleteStorjMedia(
+        _selectedPaths.toList(),
+      );
+
+      final deletedSet = response.deleted.toSet();
+      if (mounted) {
+        setState(() {
+          _images = _images.where((item) => !deletedSet.contains(item.path)).toList();
+          _selectedPaths.removeWhere(deletedSet.contains);
+          _currentOffset = _images.length;
+          if (_selectedPaths.isEmpty) {
+            _isSelectionMode = false;
+          }
+        });
+      }
+
+      if (mounted) {
+        final failCount = response.failed.length;
+        if (failCount == 0) {
+          _showSnackBar('削除しました: ${deletedSet.length}件');
+        } else {
+          _showSnackBar(
+            '削除失敗: $failCount件（成功: ${deletedSet.length}件）',
+            isError: true,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar('削除に失敗しました: $e', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? const Color(UIConstants.errorColorValue) : null,
+      ),
+    );
+  }
+
   List<StorjImageItem> _sortImages(List<StorjImageItem> items) {
     final sorted = List<StorjImageItem>.from(items);
     sorted.sort((a, b) {
@@ -210,59 +319,91 @@ class _GalleryScreenState extends State<GalleryScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'ソート',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              if (_isSelectionMode)
+                Text(
+                  '選択中: ${_selectedPaths.length}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                )
+              else
+                Text(
+                  'ソート',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               const SizedBox(width: UIConstants.smallPadding),
-              PopupMenuButton<GallerySortOption>(
-                tooltip: 'ソート',
-                initialValue: _sortOption,
-                onSelected: (value) {
-                  setState(() {
-                    _sortOption = value;
-                    _images = _sortImages(_images);
-                  });
-                },
-                itemBuilder: (context) {
-                  return GallerySortOption.values.map((option) {
-                    return CheckedPopupMenuItem<GallerySortOption>(
-                      value: option,
-                      checked: option == _sortOption,
-                      child: Text(_sortOptionLabel(option)),
-                    );
-                  }).toList();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
+              if (!_isSelectionMode)
+                PopupMenuButton<GallerySortOption>(
+                  tooltip: 'ソート',
+                  initialValue: _sortOption,
+                  onSelected: (value) {
+                    setState(() {
+                      _sortOption = value;
+                      _images = _sortImages(_images);
+                    });
+                  },
+                  itemBuilder: (context) {
+                    return GallerySortOption.values.map((option) {
+                      return CheckedPopupMenuItem<GallerySortOption>(
+                        value: option,
+                        checked: option == _sortOption,
+                        child: Text(_sortOptionLabel(option)),
+                      );
+                    }).toList();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
                     ),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _sortOptionLabel(_sortOption),
-                        style: Theme.of(context).textTheme.bodySmall,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.expand_more,
-                        size: 18,
-                      ),
-                    ],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _sortOptionLabel(_sortOption),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.expand_more,
+                          size: 18,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              if (_isSelectionMode) ...[
+                TextButton(
+                  onPressed: _isDeleting ? null : () => _setSelectionMode(false),
+                  child: const Text('キャンセル'),
+                ),
+                IconButton(
+                  icon: _isDeleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                  onPressed: (!_isDeleting && _selectedPaths.isNotEmpty)
+                      ? _confirmDeleteSelected
+                      : null,
+                  tooltip: 'Delete',
+                  iconSize: 20,
+                ),
+              ] else ...[
+                TextButton(
+                  onPressed: _isDeleting ? null : () => _setSelectionMode(true),
+                  child: const Text('選択'),
+                ),
+              ],
               IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: _loadImages,
+                onPressed: _isDeleting ? null : _loadImages,
                 tooltip: 'Refresh',
                 iconSize: 20,
               ),
@@ -404,8 +545,21 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final thumbnailUrl = item.thumbnailUrl.isNotEmpty
         ? item.thumbnailUrl
         : ApiService().getStorjMediaUrl(item.path, thumbnail: true);
+    final isSelected = _selectedPaths.contains(item.path);
     return GestureDetector(
-      onTap: () => _openMediaViewer(item),
+      onTap: () {
+        if (_isSelectionMode) {
+          _toggleSelection(item);
+        } else {
+          _openMediaViewer(item);
+        }
+      },
+      onLongPress: () {
+        if (!_isSelectionMode) {
+          _setSelectionMode(true);
+          _toggleSelection(item);
+        }
+      },
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -427,6 +581,31 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ),
             ),
           ),
+          if (_isSelectionMode && isSelected)
+            Container(
+              color: Colors.black.withOpacity(0.25),
+            ),
+          if (_isSelectionMode)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.black54,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1),
+                ),
+                child: Icon(
+                  isSelected ? Icons.check : Icons.circle_outlined,
+                  color: Colors.white,
+                  size: 14,
+                ),
+              ),
+            ),
 
           // Video badge
           if (item.isVideo)

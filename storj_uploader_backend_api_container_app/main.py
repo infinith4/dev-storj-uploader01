@@ -25,7 +25,7 @@ from video_processor import VideoProcessor
 from models import (
     UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse,
     ErrorResponse, FileUploadResult, FileInfo, FileStatus,
-    StorjImageListResponse, StorjImageItem
+    StorjImageListResponse, StorjImageItem, DeleteMediaRequest, DeleteMediaResponse
 )
 
 VIDEO_MIME_TYPES = {
@@ -956,6 +956,33 @@ async def get_storj_images(
             total_count=0,
             message=f"Error: {str(e)}"
         )
+
+@app.post(
+    "/storj/images/delete",
+    response_model=DeleteMediaResponse,
+    tags=["storj"],
+    summary="Storj画像/動画の削除",
+    description="指定したパスの画像/動画を削除します。",
+    responses={
+        200: {"description": "削除処理結果", "model": DeleteMediaResponse},
+        400: {"description": "リクエストエラー", "model": ErrorResponse},
+        500: {"description": "サーバーエラー", "model": ErrorResponse},
+    }
+)
+async def delete_storj_media(request: DeleteMediaRequest):
+    if not request.paths:
+        raise HTTPException(status_code=400, detail="削除対象のパスが指定されていません")
+
+    try:
+        success, deleted, failed, message = storj_client.delete_gallery_paths(request.paths)
+        return {
+            "success": success,
+            "deleted": deleted,
+            "failed": failed,
+            "message": message
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get(
     "/storj/images/{image_path:path}",

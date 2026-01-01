@@ -206,3 +206,19 @@ class StorjImageListResponse(BaseModel):
                 "message": "Successfully retrieved 1 images"
             }
         }
+
+class DeleteMediaRequest(BaseModel):
+    """メディア削除リクエストモデル"""
+    paths: List[str] = Field(..., description="削除対象のパス一覧")
+
+class DeleteMediaFailure(BaseModel):
+    """削除失敗アイテムモデル"""
+    path: str = Field(..., description="削除に失敗したパス")
+    message: str = Field(..., description="失敗理由")
+
+class DeleteMediaResponse(BaseModel):
+    """メディア削除レスポンスモデル"""
+    success: bool = Field(..., description="削除リクエスト成功フラグ")
+    deleted: List[str] = Field(..., description="削除成功パス一覧")
+    failed: List[DeleteMediaFailure] = Field(..., description="削除失敗一覧")
+    message: str = Field(..., description="結果メッセージ")

@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter_dropzone/flutter_dropzone.dart';
 import 'dart:html' as html;
-import 'dart:js_util' as js_util;
 import 'package:uuid/uuid.dart';
 import '../models/api_models.dart';
 import '../services/file_service.dart';

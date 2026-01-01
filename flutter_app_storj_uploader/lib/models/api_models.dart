@@ -247,6 +247,56 @@ class TriggerUploadResponse {
   }
 }
 
+class DeleteMediaFailure {
+  final String path;
+  final String message;
+
+  DeleteMediaFailure({
+    required this.path,
+    required this.message,
+  });
+
+  factory DeleteMediaFailure.fromJson(Map<String, dynamic> json) {
+    return DeleteMediaFailure(
+      path: json['path'] ?? '',
+      message: json['message'] ?? '',
+    );
+  }
+}
+
+class DeleteMediaResponse {
+  final bool success;
+  final List<String> deleted;
+  final List<DeleteMediaFailure> failed;
+  final String message;
+
+  DeleteMediaResponse({
+    required this.success,
+    required this.deleted,
+    required this.failed,
+    required this.message,
+  });
+
+  factory DeleteMediaResponse.fromJson(Map<String, dynamic> json) {
+    final deletedList = json['deleted'] is List
+        ? List<String>.from(json['deleted'])
+        : <String>[];
+    final failedList = json['failed'] is List
+        ? (json['failed'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(DeleteMediaFailure.fromJson)
+            .toList()
+        : <DeleteMediaFailure>[];
+
+    return DeleteMediaResponse(
+      success: json['success'] ?? false,
+      deleted: deletedList,
+      failed: failedList,
+      message: json['message'] ?? '',
+    );
+  }
+}
+
 // Local File Model
 class LocalFile {
   final String id;

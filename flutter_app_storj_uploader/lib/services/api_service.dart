@@ -291,6 +291,21 @@ class ApiService {
     }
   }
 
+  // Delete Storj Images/Videos
+  Future<DeleteMediaResponse> deleteStorjMedia(List<String> paths) async {
+    try {
+      final response = await _dio.post(
+        '/storj/images/delete',
+        data: {
+          'paths': paths,
+        },
+      );
+      return DeleteMediaResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
   // Get Storj Image/Video URL
   String getStorjMediaUrl(String path, {bool thumbnail = false}) {
     final baseUrl = _dio.options.baseUrl.replaceAll(RegExp(r'/$'), '');

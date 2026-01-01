@@ -22,4 +22,4 @@
 - [ ] 実機 Xaomi (2409BRN2CL）では画像をタップしても反応しない
 - [ ] アップロード一覧画面の下部には Grid ではなくリストで最新のアップロードファイルを上から過去（下）に向かって一覧を表示してください。その際に、アップロード日時、ファイルサイズ MB、撮影日時を記載して。
 - [ ] 実機 Xaomi (2409BRN2CL）では API へ接続できない
-- [ ] Frontend , Flutter Web で画像一覧や Gallery では一度にリクエストすると 503 になってしまうため、少しづつリクエストするようにして。まずは Plan を練ってから実行して。
+- [ ] Flutter Web アプリの Gallery では Azure Blob Storage の コンテナ: uploaded から Blob が削除されたら Gallery の一覧から表示されなくなります。そうではなく、Storj （rclone.config ）からサムネイル画像と実データを取得するように Backend アプリの API を利用するようにして。

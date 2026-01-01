@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 from pathlib import Path
-from typing import Optional, Tuple, Iterator
+from typing import Optional, Tuple, Iterator, List, Dict
 import threading
 import time
 from datetime import datetime
@@ -510,6 +510,134 @@ class StorjClient:
         except Exception as e:
             print(f"Error listing Storj images: {str(e)}")
             return False, [], str(e)
+
+    def _is_video_path(self, path: str) -> bool:
+        if not path:
+            return False
+        video_extensions = (
+            '.mp4', '.mov', '.avi', '.mkv', '.webm',
+            '.m4v', '.3gp', '.flv', '.wmv'
+        )
+        return path.lower().endswith(video_extensions)
+
+    def _thumbnail_key(self, path: str) -> str:
+        return str(Path(path).with_suffix('')).lower()
+
+    def _build_thumb_map(self, blob_names: List[str]) -> Dict[str, List[str]]:
+        thumb_map: Dict[str, List[str]] = defaultdict(list)
+        for name in blob_names:
+            filename = Path(name).name
+            lower = filename.lower()
+            thumb_index = lower.find('_thumb')
+            if thumb_index <= 0:
+                continue
+            base_filename = filename[:thumb_index]
+            key = str(Path(name).with_name(base_filename)).lower()
+            thumb_map[key].append(name)
+        return thumb_map
+
+    def _is_not_found_error(self, exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "not found" in message or "resourcenotfound" in message
+
+    def delete_gallery_paths(self, paths: List[str]) -> Tuple[bool, List[str], List[dict], str]:
+        if not paths:
+            return False, [], [], "No paths provided"
+
+        gallery_source = os.getenv("GALLERY_SOURCE", "").lower()
+        deleted: List[str] = []
+        failed: List[dict] = []
+
+        if gallery_source in ("azure", "blob", "storage") and self.blob_helper:
+            container_name = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+            blob_props = self.blob_helper.list_blobs_with_properties(
+                container_name=container_name
+            )
+            blob_names = [b.get("name") for b in blob_props if b.get("name")]
+            thumb_map = self._build_thumb_map(blob_names)
+
+            for path in paths:
+                if not path:
+                    failed.append({"path": path, "message": "Empty path"})
+                    continue
+
+                to_delete = [path]
+                if self._is_video_path(path):
+                    thumb_key = self._thumbnail_key(path)
+                    to_delete.extend(thumb_map.get(thumb_key, []))
+
+                for name in to_delete:
+                    try:
+                        self.blob_helper.delete_blob(
+                            name,
+                            container_name=container_name
+                        )
+                        deleted.append(name)
+                    except Exception as e:
+                        if name != path and self._is_not_found_error(e):
+                            continue
+                        failed.append({"path": name, "message": str(e)})
+
+            success = len(failed) == 0
+            message = f"Deleted {len(deleted)} item(s)"
+            return success, deleted, failed, message
+
+        # Default to Storj via rclone
+        env, error_message = self._get_rclone_env()
+        if error_message:
+            return False, [], [{"path": "*", "message": error_message}], error_message
+
+        if not paths:
+            return False, [], [], "No paths provided"
+
+        bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+        remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+        for path in paths:
+            if not path:
+                failed.append({"path": path, "message": "Empty path"})
+                continue
+
+            remote_path = f"{remote_name}:{bucket_name}/{path}"
+            cmd = ["rclone", "deletefile", remote_path]
+            result = subprocess.run(
+                cmd,
+                cwd=str(self.storj_app_path),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Unknown error"
+                failed.append({"path": path, "message": error_msg})
+                continue
+
+            deleted.append(path)
+
+            if self._is_video_path(path):
+                thumb_path = f"{Path(path).with_suffix('')}_thumb.jpg"
+                thumb_remote_path = f"{remote_name}:{bucket_name}/{thumb_path}"
+                thumb_cmd = ["rclone", "deletefile", thumb_remote_path]
+                thumb_result = subprocess.run(
+                    thumb_cmd,
+                    cwd=str(self.storj_app_path),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if thumb_result.returncode != 0:
+                    error_msg = thumb_result.stderr or "Unknown error"
+                    if "not found" not in error_msg.lower():
+                        failed.append({"path": thumb_path, "message": error_msg})
+                else:
+                    deleted.append(thumb_path)
+
+        success = len(failed) == 0
+        message = f"Deleted {len(deleted)} item(s)"
+        return success, deleted, failed, message
 
     def get_storj_image(self, image_path: str, bucket_name: str = None) -> Tuple[bool, bytes, str]:
         """
