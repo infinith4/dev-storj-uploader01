@@ -8,7 +8,7 @@ on:
         "main",
         "master",
         "develop",
-        "claude/**",,
+        "claude/**",
       ]
     paths:
       - storj_uploader_backend_api_container_app/**
