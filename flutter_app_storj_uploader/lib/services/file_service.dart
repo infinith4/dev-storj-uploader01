@@ -131,15 +131,34 @@ class FileService {
         type: type,
         allowedExtensions: allowedExtensions,
         allowMultiple: allowMultiple,
-        withData: false,
+        withData: kIsWeb,
         withReadStream: false,
       );
 
       if (result != null) {
         final List<LocalFile> localFiles = [];
         for (final file in result.files) {
+          if (kIsWeb && file.bytes != null) {
+            final localFile = await createLocalFileFromBytes(
+              file.bytes!,
+              file.name,
+            );
+            if (localFile != null) {
+              localFiles.add(localFile);
+            }
+            continue;
+          }
+
           if (file.path != null) {
             final localFile = await _createLocalFileFromPlatformFile(file);
+            if (localFile != null) {
+              localFiles.add(localFile);
+            }
+          } else if (file.bytes != null) {
+            final localFile = await createLocalFileFromBytes(
+              file.bytes!,
+              file.name,
+            );
             if (localFile != null) {
               localFiles.add(localFile);
             }
@@ -165,14 +184,14 @@ class FileService {
   // Create LocalFile from XFile (ImagePicker)
   Future<LocalFile?> _createLocalFileFromXFile(XFile xFile) async {
     try {
-      final int fileSize;
       if (kIsWeb) {
-        // For web, get file size from XFile directly
-        fileSize = await xFile.length();
-      } else {
-        final File file = File(xFile.path);
-        fileSize = await file.length();
+        final bytes = await xFile.readAsBytes();
+        return await createLocalFileFromBytes(bytes, xFile.name);
       }
+
+      final int fileSize;
+      final File file = File(xFile.path);
+      fileSize = await file.length();
       final String fileName = xFile.name;
       final String? mimeType = xFile.mimeType ?? lookupMimeType(xFile.path);
 

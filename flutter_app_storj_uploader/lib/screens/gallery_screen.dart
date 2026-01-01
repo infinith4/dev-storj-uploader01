@@ -182,6 +182,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return null;
   }
 
+  String _sortOptionLabel(GallerySortOption option) {
+    switch (option) {
+      case GallerySortOption.capturedDate:
+        return '撮影日時';
+      case GallerySortOption.uploadedDate:
+        return 'アップロード日';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -265,35 +274,41 @@ class _GalleryScreenState extends State<GalleryScreen> {
           // Header with count
           Padding(
             padding: const EdgeInsets.all(UIConstants.smallPadding),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: UIConstants.smallPadding,
+              runSpacing: UIConstants.smallPadding,
               children: [
                 Text(
                   '${_images.length} items',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButton<GallerySortOption>(
-                      value: _sortOption,
-                      underline: const SizedBox.shrink(),
-                      items: const [
-                        DropdownMenuItem(
-                          value: GallerySortOption.capturedDate,
-                          child: Text('Captured date'),
-                        ),
-                        DropdownMenuItem(
-                          value: GallerySortOption.uploadedDate,
-                          child: Text('Uploaded date'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() {
-                          _sortOption = value;
-                          _images = _sortImages(_images);
-                        });
-                      },
+                    Text(
+                      'ソート',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(width: UIConstants.smallPadding),
+                    DropdownButtonHideUnderline(
+                      child: DropdownButton<GallerySortOption>(
+                        value: _sortOption,
+                        items: GallerySortOption.values.map((option) {
+                          return DropdownMenuItem(
+                            value: option,
+                            child: Text(_sortOptionLabel(option)),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _sortOption = value;
+                            _images = _sortImages(_images);
+                          });
+                        },
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh),
