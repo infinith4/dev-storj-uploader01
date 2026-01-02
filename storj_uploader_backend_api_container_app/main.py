@@ -199,6 +199,23 @@ def _generate_video_thumbnail(
             cache_file.write(thumb_data)
         temp_cache_path.replace(cache_path)
 
+        path_obj = Path(video_path)
+        dir_name = path_obj.parent.name
+        file_stem = path_obj.stem
+        if dir_name:
+            thumb_remote_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
+        else:
+            thumb_remote_path = f"thumbnails/{file_stem}_thumb.jpg"
+        upload_success, upload_error = storj_client.upload_storj_file(
+            local_path=temp_thumb,
+            remote_path=thumb_remote_path,
+            bucket_name=bucket
+        )
+        if upload_success:
+            print(f"✓ Thumbnail uploaded to Storj: {thumb_remote_path}")
+        else:
+            print(f"⚠ Failed to upload thumbnail to Storj: {upload_error}")
+
         return True, thumb_data, "Success (generated)"
     finally:
         if temp_video and temp_video.exists():

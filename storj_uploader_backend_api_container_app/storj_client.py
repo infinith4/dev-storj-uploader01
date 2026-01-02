@@ -752,6 +752,59 @@ class StorjClient:
                 dest_path.unlink()
             return False, str(e)
 
+    def upload_storj_file(
+        self,
+        local_path: Path,
+        remote_path: str,
+        bucket_name: str = None,
+        timeout: int = 60
+    ) -> Tuple[bool, str]:
+        """
+        Storjへローカルファイルをアップロード
+        Returns: (success: bool, error_message: str)
+        """
+        try:
+            if not local_path or not local_path.exists():
+                return False, "Local file not found"
+
+            if bucket_name is None:
+                bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+            env, error_message = self._get_rclone_env()
+            if error_message:
+                return False, error_message
+
+            dest = f"{remote_name}:{bucket_name}/{remote_path}"
+            cmd = [
+                "rclone", "copyto",
+                str(local_path),
+                dest
+            ]
+
+            with self.rclone_semaphore:
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(self.storj_app_path),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Unknown error"
+                print(f"rclone copyto failed: {error_msg}")
+                return False, error_msg
+
+            return True, "Success"
+
+        except subprocess.TimeoutExpired:
+            return False, "rclone command timed out"
+        except Exception as e:
+            print(f"Error uploading Storj file: {str(e)}")
+            return False, str(e)
+
     def get_storj_object_info(self, object_path: str, bucket_name: str = None) -> Tuple[bool, dict, str]:
         """
         Storjオブジェクトのメタ情報を取得 (サイズなど)
