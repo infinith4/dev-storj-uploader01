@@ -300,6 +300,34 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
+  Widget _buildDefaultThumbnail(StorjImageItem item, {bool isLoading = false}) {
+    final icon = item.isVideo ? Icons.videocam : Icons.image_outlined;
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: isLoading
+            ? const CircularProgressIndicator(strokeWidth: 2)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'No thumbnail',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     final videoCount = _images.where((item) => item.isVideo).length;
     final imageCount = _images.length - videoCount;
@@ -571,19 +599,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
           CachedNetworkImage(
             imageUrl: thumbnailUrl,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+            placeholder: (context, url) => _buildDefaultThumbnail(
+              item,
+              isLoading: true,
             ),
-            errorWidget: (context, url, error) => Container(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Icon(
-                item.isVideo ? Icons.videocam : Icons.image,
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
+            errorWidget: (context, url, error) => _buildDefaultThumbnail(item),
           ),
           if (_isSelectionMode && isSelected)
             Container(
