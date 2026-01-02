@@ -537,10 +537,18 @@ def _log_file_status(filename: str, stage: str, status: str, details: str = ""):
 
 def _sync_upload_to_blob(file_path: Path, blob_name: str, container_name: str = None):
     """同期的にBlobにアップロード（ThreadPoolExecutor用）"""
-    if container_name:
-        blob_helper.upload_file(str(file_path), blob_name, container_name=container_name)
-    else:
-        blob_helper.upload_file(str(file_path), blob_name)
+    try:
+        print(f"[DEBUG] Starting blob upload: {blob_name}, size: {file_path.stat().st_size if file_path.exists() else 'N/A'}")
+        if container_name:
+            blob_helper.upload_file(str(file_path), blob_name, container_name=container_name)
+        else:
+            blob_helper.upload_file(str(file_path), blob_name)
+        print(f"[DEBUG] Completed blob upload: {blob_name}")
+    except Exception as e:
+        print(f"[ERROR] _sync_upload_to_blob for {blob_name}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def _sync_generate_thumbnail(video_file_path: str, thumbnail_path: str, width: int, height: int):
