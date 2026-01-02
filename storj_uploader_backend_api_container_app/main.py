@@ -1311,21 +1311,29 @@ async def get_storj_image(
                 path_obj = Path(image_path)
                 dir_name = path_obj.parent.name  # YYYYMM
                 file_stem = path_obj.stem  # filename without extension
-                thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
-                success, image_data, error_msg = storj_client.get_storj_image(
-                    image_path=thumbnail_path,
+                success, image_data, error_msg = storj_client.get_storj_thumbnail_by_prefix(
+                    video_stem=file_stem,
+                    dir_name=dir_name,
                     bucket_name=bucket_name
                 )
                 if not success or not image_data:
-                    if background_tasks:
-                        background_tasks.add_task(
-                            _schedule_video_thumbnail_generation,
-                            image_path,
-                            bucket_name
-                        )
-                    image_data = _generate_video_placeholder()
-                    success = True
-                    error_msg = "Placeholder (thumbnail not found)"
+                    thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
+                    legacy_success, legacy_data, legacy_error = storj_client.get_storj_image(
+                        image_path=thumbnail_path,
+                        bucket_name=bucket_name
+                    )
+                    if legacy_success and legacy_data:
+                        success, image_data, error_msg = legacy_success, legacy_data, legacy_error
+                    else:
+                        if background_tasks:
+                            background_tasks.add_task(
+                                _schedule_video_thumbnail_generation,
+                                image_path,
+                                bucket_name
+                            )
+                        image_data = _generate_video_placeholder()
+                        success = True
+                        error_msg = "Placeholder (thumbnail not found)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,
