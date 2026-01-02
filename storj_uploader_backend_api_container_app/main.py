@@ -547,11 +547,17 @@ async def save_file_to_target(file_path: Path, target_path: Path):
 
                 if success:
                     print(f"✓ Thumbnail generated: {thumbnail_filename}")
-                    # サムネイルもBlobにアップロード
+                    # サムネイルをBlob Storageのuploadedコンテナにアップロード
                     if blob_helper:
                         try:
-                            blob_helper.upload_file(str(thumbnail_path), thumbnail_filename)
-                            print(f"✓ Thumbnail uploaded to Blob Storage: {thumbnail_filename}")
+                            # uploadedコンテナに保存（ギャラリーが参照するコンテナ）
+                            uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+                            blob_helper.upload_file(
+                                str(thumbnail_path),
+                                thumbnail_filename,
+                                container_name=uploaded_container
+                            )
+                            print(f"✓ Thumbnail uploaded to Blob Storage ({uploaded_container}): {thumbnail_filename}")
                             thumbnail_path.unlink()  # アップロード後削除
                         except Exception as thumb_upload_error:
                             print(f"⚠ Failed to upload thumbnail to Blob: {thumb_upload_error}")
@@ -1183,24 +1189,35 @@ async def get_storj_image(
 
             if thumbnail:
                 if is_video:
-                    # Thumbnail is in thumbnails/YYYYMM/ directory
+                    # Try multiple thumbnail path formats
                     path_obj = Path(image_path)
                     dir_name = path_obj.parent.name  # YYYYMM
                     file_stem = path_obj.stem  # filename without extension
-                    thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
-                    if blob_helper.blob_exists(
-                        thumbnail_path,
-                        container_name=container_name
-                    ):
-                        image_data = blob_helper.download_blob_to_bytes(
-                            blob_name=thumbnail_path,
-                            container_name=container_name
-                        )
-                        success = bool(image_data)
-                        error_msg = "Success" if success else "Thumbnail is empty"
-                    else:
+
+                    # Candidate paths to check (in order of preference)
+                    thumbnail_candidates = [
+                        f"{file_stem}_thumb.jpg",  # New format: flat in uploaded container
+                        f"thumbnails/{dir_name}/{file_stem}_thumb.jpg",  # Old format: in thumbnails subdirectory
+                    ]
+
+                    thumbnail_found = False
+                    for thumbnail_path in thumbnail_candidates:
+                        if blob_helper.blob_exists(thumbnail_path, container_name=container_name):
+                            image_data = blob_helper.download_blob_to_bytes(
+                                blob_name=thumbnail_path,
+                                container_name=container_name
+                            )
+                            if image_data:
+                                success = True
+                                error_msg = f"Success (path: {thumbnail_path})"
+                                thumbnail_found = True
+                                print(f"✓ Video thumbnail found: {thumbnail_path}")
+                                break
+
+                    if not thumbnail_found:
                         # Return placeholder instead of generating thumbnail on-demand
                         # On-demand generation is too slow and causes timeouts
+                        print(f"⚠ Video thumbnail not found, returning placeholder for: {image_path}")
                         image_data = _generate_video_placeholder()
                         success = True
                         error_msg = "Placeholder (thumbnail not found)"
