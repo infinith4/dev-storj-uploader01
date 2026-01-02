@@ -66,7 +66,8 @@ class BlobStorageHelper:
         with open(file_path, "rb") as data:
             upload_kwargs = {
                 "overwrite": True,
-                "max_concurrency": self.upload_max_concurrency
+                "max_concurrency": self.upload_max_concurrency,
+                "timeout": 300  # 5分のタイムアウト
             }
             if self.upload_block_size_mb:
                 upload_kwargs["max_block_size"] = self.upload_block_size_mb * 1024 * 1024
@@ -74,7 +75,7 @@ class BlobStorageHelper:
                 blob_client.upload_blob(data, **upload_kwargs)
             except TypeError:
                 # Fallback for older azure-storage-blob versions without these kwargs.
-                blob_client.upload_blob(data, overwrite=True)
+                blob_client.upload_blob(data, overwrite=True, timeout=300)
 
         return blob_name
 
