@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/api_models.dart';
 import '../services/api_service.dart';
@@ -30,17 +33,26 @@ class _GalleryScreenState extends State<GalleryScreen> {
   bool _isSelectionMode = false;
   final Set<String> _selectedPaths = {};
   bool _isDeleting = false;
+  final FocusNode _keyboardFocusNode = FocusNode();
+  bool _isShiftPressed = false;
+  int? _lastSelectedIndex;
 
   @override
   void initState() {
     super.initState();
     _loadImages();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _keyboardFocusNode.requestFocus();
+      }
+    });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
@@ -131,18 +143,54 @@ class _GalleryScreenState extends State<GalleryScreen> {
       _isSelectionMode = enabled;
       if (!enabled) {
         _selectedPaths.clear();
+        _lastSelectedIndex = null;
       }
     });
   }
 
-  void _toggleSelection(StorjImageItem item) {
+  void _toggleSelectionAtIndex(int index) {
+    if (index < 0 || index >= _images.length) return;
+    final item = _images[index];
     setState(() {
       if (_selectedPaths.contains(item.path)) {
         _selectedPaths.remove(item.path);
       } else {
         _selectedPaths.add(item.path);
       }
+      _lastSelectedIndex = index;
     });
+  }
+
+  void _selectRange(int index) {
+    if (_images.isEmpty) return;
+    final anchor = _lastSelectedIndex ?? index;
+    final start = math.min(anchor, index);
+    final end = math.max(anchor, index);
+    setState(() {
+      _isSelectionMode = true;
+      for (var i = start; i <= end; i++) {
+        _selectedPaths.add(_images[i].path);
+      }
+      _lastSelectedIndex = index;
+    });
+  }
+
+  void _handleKeyEvent(RawKeyEvent event) {
+    final isShift = event.isShiftPressed;
+    if (_isShiftPressed != isShift && mounted) {
+      setState(() {
+        _isShiftPressed = isShift;
+      });
+    }
+  }
+
+  Widget _wrapWithKeyboardListener(Widget child) {
+    return RawKeyboardListener(
+      focusNode: _keyboardFocusNode,
+      autofocus: true,
+      onKey: _handleKeyEvent,
+      child: child,
+    );
   }
 
   Future<void> _confirmDeleteSelected() async {
@@ -451,13 +499,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
+      return _wrapWithKeyboardListener(const Center(
         child: CircularProgressIndicator(),
-      );
+      ));
     }
 
     if (_errorMessage != null) {
-      return Column(
+      return _wrapWithKeyboardListener(Column(
         children: [
           _buildHeader(),
           Expanded(
@@ -495,11 +543,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
           ),
         ],
-      );
+      ));
     }
 
     if (_images.isEmpty) {
-      return Column(
+      return _wrapWithKeyboardListener(Column(
         children: [
           _buildHeader(),
           Expanded(
@@ -535,10 +583,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
           ),
         ],
-      );
+      ));
     }
 
-    return RefreshIndicator(
+    return _wrapWithKeyboardListener(RefreshIndicator(
       onRefresh: _loadImages,
       child: Column(
         children: [
@@ -566,33 +614,42 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 }
 
                 final item = _images[index];
-                return _buildGridItem(item);
+                return _buildGridItem(item, index);
               },
             ),
           ),
         ],
       ),
-    );
+    ));
   }
 
-  Widget _buildGridItem(StorjImageItem item) {
+  Widget _buildGridItem(StorjImageItem item, int index) {
     final thumbnailUrl = item.thumbnailUrl.isNotEmpty
         ? item.thumbnailUrl
         : ApiService().getStorjMediaUrl(item.path, thumbnail: true);
     final isSelected = _selectedPaths.contains(item.path);
     return GestureDetector(
       onTap: () {
-        if (_isSelectionMode) {
-          _toggleSelection(item);
+        _keyboardFocusNode.requestFocus();
+        if (_isSelectionMode || _isShiftPressed) {
+          if (!_isSelectionMode) {
+            _setSelectionMode(true);
+          }
+          if (_isShiftPressed) {
+            _selectRange(index);
+          } else {
+            _toggleSelectionAtIndex(index);
+          }
         } else {
           _openMediaViewer(item);
         }
       },
       onLongPress: () {
+        _keyboardFocusNode.requestFocus();
         if (!_isSelectionMode) {
           _setSelectionMode(true);
-          _toggleSelection(item);
         }
+        _toggleSelectionAtIndex(index);
       },
       child: Stack(
         fit: StackFit.expand,
