@@ -428,7 +428,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   ),
                 ] else ...[
                   TextButton(
-                    onPressed: _isDeleting ? null : () => _setSelectionMode(true),
+                    onPressed: (_isDeleting || _images.isEmpty)
+                        ? null
+                        : () => _setSelectionMode(true),
                     child: const Text('選択'),
                   ),
                 ],
