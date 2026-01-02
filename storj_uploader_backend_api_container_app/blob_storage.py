@@ -70,7 +70,11 @@ class BlobStorageHelper:
             }
             if self.upload_block_size_mb:
                 upload_kwargs["max_block_size"] = self.upload_block_size_mb * 1024 * 1024
-            blob_client.upload_blob(data, **upload_kwargs)
+            try:
+                blob_client.upload_blob(data, **upload_kwargs)
+            except TypeError:
+                # Fallback for older azure-storage-blob versions without these kwargs.
+                blob_client.upload_blob(data, overwrite=True)
 
         return blob_name
 
@@ -94,7 +98,10 @@ class BlobStorageHelper:
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
         with open(local_path, "wb") as download_file:
-            downloader = blob_client.download_blob(max_concurrency=self.download_max_concurrency)
+            try:
+                downloader = blob_client.download_blob(max_concurrency=self.download_max_concurrency)
+            except TypeError:
+                downloader = blob_client.download_blob()
             download_file.write(downloader.readall())
 
     def list_blobs(self, container_name: Optional[str] = None, prefix: Optional[str] = None) -> List[str]:
@@ -208,11 +215,18 @@ class BlobStorageHelper:
             container=container_name,
             blob=blob_name
         )
-        return blob_client.download_blob(
-            offset=offset,
-            length=length,
-            max_concurrency=self.download_max_concurrency
-        ).readall()
+        try:
+            downloader = blob_client.download_blob(
+                offset=offset,
+                length=length,
+                max_concurrency=self.download_max_concurrency
+            )
+        except TypeError:
+            downloader = blob_client.download_blob(
+                offset=offset,
+                length=length
+            )
+        return downloader.readall()
 
     def stream_blob(
         self,
@@ -232,11 +246,17 @@ class BlobStorageHelper:
             container=container_name,
             blob=blob_name
         )
-        downloader = blob_client.download_blob(
-            offset=offset,
-            length=length,
-            max_concurrency=self.download_max_concurrency
-        )
+        try:
+            downloader = blob_client.download_blob(
+                offset=offset,
+                length=length,
+                max_concurrency=self.download_max_concurrency
+            )
+        except TypeError:
+            downloader = blob_client.download_blob(
+                offset=offset,
+                length=length
+            )
         return downloader.chunks(chunk_size=chunk_size)
 
     def move_blob(self, blob_name: str, source_container: Optional[str] = None, dest_container: Optional[str] = None):
