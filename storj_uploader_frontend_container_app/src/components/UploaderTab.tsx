@@ -105,6 +105,9 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
           if (status === 'uploaded') {
             return { ...f, status: 'success', progress: 100 };
           }
+          if (status === 'error' || status === 'failed') {
+            return { ...f, status: 'error', progress: 100 };
+          }
           if (status === 'queued' || status === 'processing') {
             allDone = false;
             return { ...f, status: 'processing', progress: Math.max(f.progress, 90) };

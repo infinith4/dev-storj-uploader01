@@ -4,8 +4,13 @@ services:
     volumes:
       - ./upload_target:/app/upload_target
       - ./uploaded:/app/uploaded
+      - ./temp:/mnt/temp
       - ./rclone.conf:/root/.config/rclone/rclone.conf:ro
       - ./.env:/app/.env:ro
     environment:
       - STORJ_BUCKET_NAME=${STORJ_BUCKET_NAME:-my-storj-bucket}
       - STORJ_REMOTE_NAME=${STORJ_REMOTE_NAME:-storj}
+      - FILE_SHARE_MOUNT=/mnt/temp
+      - PORT=8080
+    ports:
+      - "8080:8080"

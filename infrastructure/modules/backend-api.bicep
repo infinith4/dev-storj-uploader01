@@ -166,20 +166,16 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
               value: apiBaseUrl
             }
             {
+              name: 'STORJ_CONTAINER_URL'
+              value: 'http://stjup2-storj-udm3tutq7eb7i/process'
+            }
+            {
               name: 'AZURE_STORAGE_ACCOUNT_NAME'
-              value: storageAccountName
+              value: ''
             }
             {
               name: 'AZURE_STORAGE_ACCOUNT_KEY'
-              secretRef: 'storage-key'
-            }
-            {
-              name: 'AZURE_STORAGE_UPLOAD_CONTAINER'
-              value: 'upload-target'
-            }
-            {
-              name: 'AZURE_STORAGE_UPLOADED_CONTAINER'
-              value: 'uploaded'
+              value: ''
             }
             {
               name: 'CLOUD_ENV'

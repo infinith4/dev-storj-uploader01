@@ -7,6 +7,7 @@ Storjクラウドストレージにファイルを自動アップロードする
 - rcloneを使用したStorjバケットの自動作成（存在しない場合のみ）
 - YYYYMM形式のディレクトリ構造でファイルアップロード
 - アップロード後のファイル自動移動機能
+- Azure File Share上のキュー(JSON)をHTTP (`/process`)で処理し、KEDA HTTPで0→Nスケール
 - Dockerコンテナでの実行
 
 ## セットアップ

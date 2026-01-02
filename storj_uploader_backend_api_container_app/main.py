@@ -31,6 +31,8 @@ from models import (
     StorjImageListResponse, StorjImageItem, DeleteMediaRequest, DeleteMediaResponse,
     UploadStatusResponse
 )
+from upload_queue import UploadQueue
+from urllib import request as urllib_request
 
 VIDEO_MIME_TYPES = {
     ".mp4": "video/mp4",
@@ -427,6 +429,7 @@ if BLOB_STORAGE_AVAILABLE and BlobStorageHelper:
     except Exception as e:
         print(f"⚠ Failed to initialize Blob Storage in main.py: {e}")
         print("  Files will be stored locally instead")
+upload_queue = UploadQueue()
 
 # CORS設定
 app.add_middleware(
@@ -452,7 +455,7 @@ app.add_middleware(
 # 設定
 UPLOAD_TARGET_DIR = storj_client.get_upload_target_dir()
 UPLOADED_DIR = storj_client.get_uploaded_dir()
-TEMP_DIR = Path(os.getenv('TEMP_DIR', './temp'))
+TEMP_DIR = Path(os.getenv('TEMP_DIR', '/mnt/temp'))
 MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', '100000000'))  # 100MB
 SUPPORTED_IMAGE_FORMATS = {'jpeg', 'jpg', 'png', 'heic', 'heif', 'webp', 'bmp', 'tiff'}
 MIRROR_BLOB_TO_LOCAL = os.getenv('MIRROR_BLOB_TO_LOCAL', 'true').lower() == 'true'
@@ -555,32 +558,72 @@ def _sync_generate_thumbnail(video_file_path: str, thumbnail_path: str, width: i
     """同期的にサムネイル生成（ThreadPoolExecutor用）"""
     return VideoProcessor.generate_thumbnail(video_file_path, thumbnail_path, width=width, height=height)
 
+def _trigger_storj_processor():
+    """Storj Container (KEDA HTTP) を起動させるためのHTTPトリガー"""
+    url = os.getenv("STORJ_CONTAINER_URL")
+    if not url:
+        print("STORJ_CONTAINER_URL not set; skipping trigger")
+        return False, "STORJ_CONTAINER_URL not set"
+    try:
+        req = urllib_request.Request(url, method="POST")
+        with urllib_request.urlopen(req, timeout=5) as resp:
+            _ = resp.read()
+        print(f"Triggered Storj processor via HTTP: {url}")
+        return True, "triggered"
+    except Exception as e:
+        print(f"Failed to trigger Storj processor: {e}")
+        return False, str(e)
+
+async def _enqueue_file(
+    unique_filename: str,
+    original_filename: str,
+    content: bytes,
+    content_type: str
+) -> FileUploadResult:
+    """ファイルをFile Shareキューに保存し、Storj Containerをトリガー"""
+    files_dir = upload_queue.files_dir
+    files_dir.mkdir(parents=True, exist_ok=True)
+    target_path = files_dir / unique_filename
+
+    async with aiofiles.open(target_path, 'wb') as f:
+        await f.write(content)
+
+    upload_queue.add_upload_request(
+        file_path=target_path,
+        file_name=unique_filename,
+        file_size=len(content),
+        content_type=content_type,
+        saved_as=unique_filename,
+        original_name=original_filename
+    )
+
+    _trigger_storj_processor()
+
+    return FileUploadResult(
+        filename=original_filename,
+        saved_as=unique_filename,
+        status=FileStatus.SUCCESS,
+        message="キューに追加しました"
+    )
+
 def _file_status(name: str) -> str:
     """
-    アップロード進捗ステータスを判定
-    queued: upload-targetに存在
-    uploaded: uploadedコンテナ/ディレクトリに存在
-    processing/unknown: どちらにもない
+    アップロード進捗ステータスを判定 (File Share キュー準拠)
+    queued -> queue に存在
+    processing -> queue 状態が processing
+    uploaded -> processed かつ成功
     """
-    # Blob Storage優先
-    if blob_helper:
-        upload_container = os.getenv("AZURE_STORAGE_UPLOAD_CONTAINER", "upload-target")
-        uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
-        try:
-            if blob_helper.blob_exists(name, container_name=uploaded_container):
-                return "uploaded"
-            if blob_helper.blob_exists(name, container_name=upload_container):
-                return "queued"
-        except Exception:
-            pass
-
-    # ローカルチェック
-    if (UPLOAD_TARGET_DIR / name).exists():
+    status_info = upload_queue.get_status_by_saved_as(name)
+    status = status_info.get("status", "unknown")
+    if status in ("pending", "queued"):
         return "queued"
-    if (UPLOADED_DIR / name).exists():
+    if status == "processing":
+        return "processing"
+    if status == "completed":
         return "uploaded"
-
-    return "processing"
+    if status == "failed":
+        return "error"
+    return "unknown"
 
 async def save_file_to_target(file_path: Path, target_path: Path):
     """ファイルをターゲットディレクトリに移動し、必要に応じてアップロードをトリガー"""
@@ -806,17 +849,14 @@ async def upload_images(
 
             # 一意のファイル名生成
             unique_filename = ImageProcessor.generate_unique_filename(file.filename)
-            temp_path = TEMP_DIR / unique_filename
-            target_path = UPLOAD_TARGET_DIR / unique_filename
+            result = await _enqueue_file(
+                unique_filename=unique_filename,
+                original_filename=file.filename,
+                content=content,
+                content_type=file.content_type or "application/octet-stream"
+            )
 
-            # 一時ファイルに保存
-            async with aiofiles.open(temp_path, 'wb') as f:
-                await f.write(content)
-
-            # 非同期でBlob Storageにアップロード
-            await save_file_to_target(temp_path, target_path)
-
-            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"saved as {unique_filename}")
+            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"queued as {unique_filename}")
             return {
                 "filename": file.filename,
                 "saved_as": unique_filename,
@@ -930,20 +970,16 @@ async def upload_files(
 
             # 一意のファイル名生成
             unique_filename = FileProcessor.generate_unique_filename(file.filename)
-            temp_path = TEMP_DIR / unique_filename
-            target_path = UPLOAD_TARGET_DIR / unique_filename
-
-            # ファイル情報取得
             file_info = FileProcessor.get_file_info(file.filename, len(content))
 
-            # 一時ファイルに保存
-            async with aiofiles.open(temp_path, 'wb') as f:
-                await f.write(content)
+            await _enqueue_file(
+                unique_filename=unique_filename,
+                original_filename=file.filename,
+                content=content,
+                content_type=file.content_type or "application/octet-stream"
+            )
 
-            # 非同期でBlob Storageにアップロード（バックグラウンドではなく直接実行）
-            await save_file_to_target(temp_path, target_path)
-
-            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"saved as {unique_filename}")
+            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"queued as {unique_filename}")
             return {
                 "filename": file.filename,
                 "saved_as": unique_filename,
@@ -1003,8 +1039,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "upload_target_dir": str(UPLOAD_TARGET_DIR),
-        "upload_target_exists": UPLOAD_TARGET_DIR.exists()
+        "upload_target_dir": str(upload_queue.files_dir),
+        "upload_target_exists": upload_queue.files_dir.exists()
     }
 
 @app.get(
@@ -1025,12 +1061,10 @@ async def health_check():
 async def get_status():
     """システムステータス取得"""
     try:
-        # アップロード対象ディレクトリのファイル数
-        target_files = list(UPLOAD_TARGET_DIR.glob('*')) if UPLOAD_TARGET_DIR.exists() else []
-        target_count = len([f for f in target_files if f.is_file()])
-
-        # 一時ディレクトリのファイル数
-        temp_files = list(TEMP_DIR.glob('*')) if TEMP_DIR.exists() else []
+        # File Share キューのファイル数
+        target_count = upload_queue.get_pending_count()
+        processed_count = upload_queue.get_processed_count()
+        temp_files = list(upload_queue.files_dir.glob('*')) if upload_queue.files_dir.exists() else []
         temp_count = len([f for f in temp_files if f.is_file()])
 
         # Storjクライアントのステータス
@@ -1038,10 +1072,11 @@ async def get_status():
 
         return {
             "api_info": {
-                "upload_target_dir": str(UPLOAD_TARGET_DIR),
-                "temp_dir": str(TEMP_DIR),
+                "upload_target_dir": str(upload_queue.queue_dir),
+                "temp_dir": str(upload_queue.files_dir),
                 "files_in_target": target_count,
                 "files_in_temp": temp_count,
+                "files_processed": processed_count,
                 "supported_image_formats": list(SUPPORTED_IMAGE_FORMATS),
                 "max_file_size_mb": MAX_FILE_SIZE / (1024 * 1024),
                 "endpoints": {
@@ -1075,7 +1110,7 @@ async def trigger_upload():
     手動でStorjアップロードを実行
     """
     try:
-        file_count = storj_client.count_files_in_target()
+        file_count = upload_queue.get_pending_count()
         if file_count == 0:
             return {
                 "status": "no_files",
@@ -1083,11 +1118,11 @@ async def trigger_upload():
                 "files_count": 0
             }
 
-        success, output = storj_client.run_storj_uploader()
+        success, output = _trigger_storj_processor()
 
         return {
             "status": "success" if success else "error",
-            "message": "アップロード処理が完了しました" if success else "アップロード処理でエラーが発生しました",
+            "message": "Storj コンテナを起動しました" if success else "トリガーに失敗しました",
             "files_processed": file_count,
             "output": output
         }
@@ -1115,7 +1150,7 @@ async def trigger_upload_async():
     非同期でStorjアップロードを実行
     """
     try:
-        file_count = storj_client.count_files_in_target()
+        file_count = upload_queue.get_pending_count()
         if file_count == 0:
             return {
                 "status": "no_files",
@@ -1123,12 +1158,13 @@ async def trigger_upload_async():
                 "files_count": 0
             }
 
-        storj_client.run_storj_uploader_async()
+        success, output = _trigger_storj_processor()
 
         return {
-            "status": "started",
-            "message": "バックグラウンドでアップロード処理を開始しました",
-            "files_to_process": file_count
+            "status": "started" if success else "error",
+            "message": "Storj コンテナを起動しました" if success else f"トリガーに失敗しました: {output}",
+            "files_to_process": file_count,
+            "output": output
         }
     except Exception as e:
         return {

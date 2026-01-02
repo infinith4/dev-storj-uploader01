@@ -45,13 +45,11 @@ else
     echo "  Using default or existing rclone configuration"
 fi
 
-# Azure Blob Storage設定確認
-if [ -n "$AZURE_STORAGE_ACCOUNT_NAME" ]; then
-    echo "✓ Azure Blob Storage configured: $AZURE_STORAGE_ACCOUNT_NAME"
-else
-    echo "⚠ Azure Blob Storage not configured (will use local filesystem)"
-fi
+# File Share mount確認
+FILE_SHARE_MOUNT="${FILE_SHARE_MOUNT:-/mnt/temp}"
+echo "Using file share mount at: $FILE_SHARE_MOUNT"
+mkdir -p "$FILE_SHARE_MOUNT/files" "$FILE_SHARE_MOUNT/queue" "$FILE_SHARE_MOUNT/processed"
 
 # アプリケーションを起動
-echo "Starting Storj Uploader application..."
-exec python3 storj_uploader.py
+echo "Starting Storj HTTP processor..."
+exec python3 http_processor.py

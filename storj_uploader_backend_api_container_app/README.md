@@ -175,12 +175,18 @@ docker-compose up --build
 - **アーカイブ**: ZIP, RAR, 7Z, TAR, GZ等
 - **その他**: すべてのファイル形式（制限なし）
 
+### 進捗確認
+- POST `/upload/status`  
+  Body: `{"files": ["<saved_as1>", "<saved_as2>"]}`  
+  レスポンス: `queued` / `processing` / `uploaded` / `error`
+
 ## 設定
 
 | 環境変数 | デフォルト値 | 説明 |
 |---------|-------------|------|
 | UPLOAD_TARGET_DIR | ../storj_container_app/upload_target | Storjアップロード対象ディレクトリ |
-| TEMP_DIR | ./temp | 一時ファイル保存ディレクトリ |
+| TEMP_DIR | /mnt/temp | 一時ファイル保存ディレクトリ (Azure File Share) |
+| STORJ_CONTAINER_URL | http://stjup2-storj-udm3tutq7eb7i/process | Storj Container HTTPトリガー |
 | MAX_FILE_SIZE | 100000000 | 最大ファイルサイズ（バイト） |
 | UPLOAD_WORKERS | 8 | Blob Storage I/O用スレッド数 |
 | AZURE_BLOB_UPLOAD_CONCURRENCY | 4 | Blobアップロードの並列度 |

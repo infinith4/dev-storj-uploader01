@@ -252,6 +252,236 @@ az keyvault set-policy \
   --secret-permissions get list set delete
 ```
 
+## アーキテクチャ変更 (2026-01-02): Azure File Share + KEDA HTTP イベント駆動
+
+### 背景と目的
+
+#### 解決すべき課題
+
+1. **Azure Blob Storage アップロードタイムアウト**
+   - 4MB 動画ファイルのアップロードに 60 秒以上かかり、504 Gateway Timeout が発生
+   - タイムアウト延長では根本解決にならない
+
+2. **ファイル共有の欠如**
+   - Backend API と Storj Container App の間で共有ファイルシステムがない
+   - 現状は Blob Storage 経由でファイルを受け渡し（遅延の原因）
+
+3. **常時起動によるコスト**
+   - Storj Container App が常時稼働しており、アイドル時もリソースを消費
+   - 実際にアップロード処理が必要な時のみ起動すべき
+
+4. **Service Bus のコスト**
+   - 初期案の Service Bus は月額約 1,000 円かかるため却下
+
+#### 解決策の方針
+
+**Azure File Share + HTTP Polling + KEDA HTTP Add-on** を使用:
+- Azure Blob Storage を完全に排除
+- Azure File Share (`/mnt/temp`) でファイルを共有
+- JSON ファイルでアップロードキューを管理
+- KEDA HTTP Add-on で Storj Container App をオンデマンド起動 (0→N, N→0)
+- **追加コスト: ¥0** (既存リソースのみ使用)
+
+### 新アーキテクチャ概要
+
+```
+┌─────────────┐
+│  Frontend   │
+└──────┬──────┘
+       │ POST /upload/files/single
+       ▼
+┌────────────────────────────────────────────────────────────┐
+│  Backend API (stjup2-backend-udm3tutq7eb7i)               │
+│                                                            │
+│  1. Save file to Azure File Share (/mnt/temp)            │
+│  2. Create upload request JSON file                       │
+│     /mnt/temp/queue/upload-{uuid}.json                    │
+│     {                                                      │
+│       "file_path": "/mnt/temp/files/xxx.mp4",            │
+│       "file_name": "xxx.mp4",                            │
+│       "file_size": 4194304,                              │
+│       "content_type": "video/mp4",                       │
+│       "status": "pending"                                │
+│     }                                                      │
+│  3. Trigger Storj Container via HTTP endpoint            │
+│     POST http://stjup2-storj-udm3tutq7eb7i/process       │
+└────────────────────────┬───────────────────────────────────┘
+                         │
+                         │ HTTP request triggers KEDA
+                         │ (scale 0→1)
+                         ▼
+┌────────────────────────────────────────────────────────────┐
+│  Storj Container App (stjup2-storj-udm3tutq7eb7i)         │
+│  (with KEDA HTTP Add-on scaler)                           │
+│                                                            │
+│  HTTP Endpoint: POST /process                             │
+│                                                            │
+│  1. Scan /mnt/temp/queue/ for pending JSON files         │
+│  2. For each pending file:                                │
+│     - Read file from /mnt/temp/files/{filename}          │
+│     - Upload to Storj using rclone                        │
+│     - Update JSON: status = "completed"/"failed"         │
+│     - Move JSON to /mnt/temp/processed/                  │
+│     - Delete file from /mnt/temp/files/                  │
+│  3. Return response                                        │
+│                                                            │
+│  When no requests for 5 min → KEDA scales to 0           │
+└────────────────────────────────────────────────────────────┘
+```
+
+### ディレクトリ構造 (/mnt/temp/)
+
+```
+/mnt/temp/
+├── files/                    # アップロードされたファイル (一時保存)
+│   ├── xxx.mp4
+│   └── yyy.jpg
+├── queue/                    # 未処理のアップロードリクエスト
+│   ├── upload-{uuid-1}.json
+│   └── upload-{uuid-2}.json
+└── processed/               # 処理済みリクエスト (ログ用)
+    ├── upload-{uuid-3}.json
+    └── upload-{uuid-4}.json
+```
+
+### 環境変数の変更
+
+#### Backend API 環境変数 (更新)
+
+| 環境変数                     | 値                                         | 説明                              |
+| ---------------------------- | ------------------------------------------ | --------------------------------- |
+| `TEMP_DIR`                   | `/mnt/temp`                                | ファイル一時保存先 (File Share)   |
+| `STORJ_CONTAINER_URL`        | `http://stjup2-storj-udm3tutq7eb7i/process` | Storj Container エンドポイント    |
+| `AZURE_STORAGE_ACCOUNT_NAME` | `` (空: Blob Storage 無効化)               | Blob Storage 無効                 |
+| `AZURE_STORAGE_ACCOUNT_KEY`  | `` (空: Blob Storage 無効化)               | Blob Storage 無効                 |
+| `UPLOAD_TARGET_DIR`          | (削除予定)                                 | 旧アーキテクチャの設定            |
+
+#### Storj Container App 環境変数 (更新)
+
+| 環境変数            | 値                      | 説明                       |
+| ------------------- | ----------------------- | -------------------------- |
+| `FILE_SHARE_MOUNT`  | `/mnt/temp`             | ファイル読み取り先         |
+| `PORT`              | `8080`                  | HTTP Server ポート         |
+| `STORJ_BUCKET_NAME` | `stg-storj-uploader-01` | Storj バケット名           |
+| `STORJ_REMOTE_NAME` | `storj`                 | rclone リモート名          |
+| `HASH_LENGTH`       | `10`                    | ハッシュ長                 |
+| `MAX_WORKERS`       | `8`                     | 並列アップロード数         |
+
+### Volume Mount 設定
+
+#### Container Apps Environment Storage
+
+```bash
+# Storage定義を追加 (環境に)
+az containerapp env storage set \
+  --name stjup2-env-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --storage-name temp \
+  --azure-file-account-name stjup2studm3tutq7eb7i \
+  --azure-file-account-key <storage_key> \
+  --azure-file-share-name temp \
+  --access-mode ReadWrite
+```
+
+#### Backend API Volume Mount
+
+- Volume Name: `temp`
+- Storage Name: `temp`
+- Mount Path: `/mnt/temp`
+- Access Mode: ReadWrite
+
+#### Storj Container App Volume Mount
+
+- Volume Name: `temp`
+- Storage Name: `temp`
+- Mount Path: `/mnt/temp`
+- Access Mode: ReadWrite
+
+### KEDA HTTP Add-on 設定
+
+Storj Container App に KEDA HTTP Add-on Scaler を追加:
+
+```bash
+# Storj Container Appのスケール設定
+az containerapp update \
+  --name stjup2-storj-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --min-replicas 0 \
+  --max-replicas 3 \
+  --scale-rule-name http-scaler \
+  --scale-rule-type http \
+  --scale-rule-http-concurrency 1
+```
+
+**KEDA HTTP Scaler 設定内容:**
+- **Type**: `http`
+- **Min Replicas**: 0 (アイドル時は停止)
+- **Max Replicas**: 3 (並列処理用)
+- **Target Pending Requests**: 1 (リクエストがあれば起動)
+
+### 実装ステップ概要
+
+1. **Azure File Share の作成/確認**
+   - Storage Account: `stjup2studm3tutq7eb7i`
+   - File Share: `temp`
+   - Quota: 100GB
+
+2. **Backend API の変更**
+   - 新規ファイル: `upload_queue.py` (Upload Queue Manager)
+   - 変更: `main.py` (Queue への追加、HTTP トリガー)
+
+3. **Storj Container App の変更**
+   - 新規ファイル: `http_processor.py` (HTTP Server + Queue Processor)
+   - 変更: `storj_uploader.py` (単一ファイルアップロード対応)
+   - 変更: `Dockerfile` (CMD を `http_processor.py` に変更、EXPOSE 8080)
+   - 追加: `flask==3.0.0` (requirements.txt)
+
+4. **Volume Mount 設定**
+   - Container Apps Environment に Storage 追加
+   - Backend API に Volume Mount 追加
+   - Storj Container App に Volume Mount 追加
+
+5. **KEDA HTTP Add-on 設定**
+   - Storj Container App に HTTP scaler 追加
+   - min-replicas: 0, max-replicas: 3
+   - Internal Ingress 有効化 (port 8080)
+
+6. **デプロイと動作確認**
+   - Backend API のビルド・デプロイ
+   - Storj Container App のビルド・デプロイ
+   - 動作確認 (0→1 スケール、アップロード完了、1→0 スケール)
+
+### メリット
+
+1. **コストゼロ**: 追加コスト ¥0 (既存リソースのみ使用)
+2. **シンプル実装**: JSON ファイルベースのキュー (追加の SDK 不要)
+3. **スケーラビリティ**: KEDA HTTP Add-on で 0→N、N→0 スケーリング
+4. **アイドル時停止**: リクエストがない時は完全停止 (コスト削減)
+5. **タイムアウト解消**: Blob Storage を経由しないため高速化
+
+### リスクと対策
+
+#### リスク 1: File Share の容量
+- **対策**: アップロード成功後にファイルを削除、processed/ ディレクトリは定期的にクリーンアップ
+
+#### リスク 2: 同時アップロード時の競合
+- **対策**: ファイルロック機能を追加、または max-replicas: 1 に制限
+
+#### リスク 3: HTTP トリガーの失敗
+- **対策**: Fire-and-forget で実装 (Queue にファイルは残る)、定期ポーリング処理を追加
+
+### 詳細な実装計画
+
+完全な実装プランは以下のファイルを参照してください:
+- `/home/vscode/.claude/plans/parsed-sleeping-dusk.md`
+
+このファイルには以下が含まれます:
+- 詳細なコード例
+- すべての変更ファイルリスト
+- デプロイコマンド
+- 動作確認手順
+- ロールバック手順
+
 ## 関連ドキュメント
 
 - [CLAUDE.md](./CLAUDE.md) - プロジェクト全体の構成
@@ -261,9 +491,10 @@ az keyvault set-policy \
 
 ## 更新履歴
 
-| 日付       | 変更内容                                   |
-| ---------- | ------------------------------------------ |
-| 2025-12-31 | 初版作成 - 現在の Azure 環境の構成を文書化 |
+| 日付       | 変更内容                                                                        |
+| ---------- | ------------------------------------------------------------------------------- |
+| 2025-12-31 | 初版作成 - 現在の Azure 環境の構成を文書化                                      |
+| 2026-01-02 | アーキテクチャ変更 - Azure File Share + KEDA HTTP イベント駆動スケーリング導入 |
 
 ## コンテナの再起動
 
