@@ -167,7 +167,7 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'STORJ_CONTAINER_URL'
-              value: 'http://stjup2-storj-udm3tutq7eb7i/process'
+              value: 'http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process'
             }
             {
               name: 'AZURE_STORAGE_ACCOUNT_NAME'
