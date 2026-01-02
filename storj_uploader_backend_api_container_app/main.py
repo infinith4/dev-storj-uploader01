@@ -1277,6 +1277,7 @@ async def get_storj_image(
         # サムネイルまたはフルサイズ画像を取得
         if thumbnail:
             if is_video:
+                bucket_name = bucket or os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
                 # Thumbnail is in thumbnails/YYYYMM/ directory
                 path_obj = Path(image_path)
                 dir_name = path_obj.parent.name  # YYYYMM
@@ -1284,14 +1285,21 @@ async def get_storj_image(
                 thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
                 success, image_data, error_msg = storj_client.get_storj_image(
                     image_path=thumbnail_path,
-                    bucket_name=bucket
+                    bucket_name=bucket_name
                 )
                 if not success or not image_data:
-                    # Return placeholder instead of generating thumbnail on-demand
-                    # On-demand generation is too slow and causes timeouts
-                    image_data = _generate_video_placeholder()
-                    success = True
-                    error_msg = "Placeholder (thumbnail not found)"
+                    gen_success, gen_data, gen_error = _generate_video_thumbnail(
+                        video_path=image_path,
+                        bucket=bucket_name
+                    )
+                    if gen_success and gen_data:
+                        image_data = gen_data
+                        success = True
+                        error_msg = gen_error
+                    else:
+                        image_data = _generate_video_placeholder()
+                        success = True
+                        error_msg = f"Placeholder (thumbnail not found: {gen_error})"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,

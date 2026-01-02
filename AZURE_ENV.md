@@ -265,22 +265,69 @@ az keyvault set-policy \
 | ---------- | ------------------------------------------ |
 | 2025-12-31 | 初版作成 - 現在の Azure 環境の構成を文書化 |
 
+## コンテナの再起動
+
+### 方法1: リビジョンを直接再起動（推奨）
+
+```bash
+# アクティブなリビジョンを取得して再起動
+az containerapp revision restart \
+  --name stjup2-backend-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --revision $(az containerapp revision list --name stjup2-backend-udm3tutq7eb7i --resource-group rg-dev-storjup --query "[?properties.active].name" -o tsv)
+
+az containerapp revision restart \
+  --name stjup2-frontend-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --revision $(az containerapp revision list --name stjup2-frontend-udm3tutq7eb7i --resource-group rg-dev-storjup --query "[?properties.active].name" -o tsv)
+
+az containerapp revision restart \
+  --name stjup2-flutter-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --revision $(az containerapp revision list --name stjup2-flutter-udm3tutq7eb7i --resource-group rg-dev-storjup --query "[?properties.active].name" -o tsv)
+
+az containerapp revision restart \
+  --name stjup2-storj-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --revision $(az containerapp revision list --name stjup2-storj-udm3tutq7eb7i --resource-group rg-dev-storjup --query "[?properties.active].name" -o tsv)
 ```
-# リビジョンを更新して再起動
+
+### 方法2: 新しいリビジョンを強制作成（環境変数でトリガー）
+
+```bash
+# ダミーの環境変数を更新して新しいリビジョンを作成
 az containerapp update \
   --name stjup2-backend-udm3tutq7eb7i \
-  --resource-group rg-dev-storjup
+  --resource-group rg-dev-storjup \
+  --set-env-vars RESTART_TRIGGER="$(date +%s)"
 
 az containerapp update \
   --name stjup2-frontend-udm3tutq7eb7i \
-  --resource-group rg-dev-storjup
+  --resource-group rg-dev-storjup \
+  --set-env-vars RESTART_TRIGGER="$(date +%s)"
 
 az containerapp update \
   --name stjup2-flutter-udm3tutq7eb7i \
-  --resource-group rg-dev-storjup
+  --resource-group rg-dev-storjup \
+  --set-env-vars RESTART_TRIGGER="$(date +%s)"
 
 az containerapp update \
   --name stjup2-storj-udm3tutq7eb7i \
-  --resource-group rg-dev-storjup
+  --resource-group rg-dev-storjup \
+  --set-env-vars RESTART_TRIGGER="$(date +%s)"
+```
 
+### 全コンテナを一括再起動（ワンライナー）
+
+```bash
+# 方法1: リビジョン再起動
+for app in stjup2-backend-udm3tutq7eb7i stjup2-frontend-udm3tutq7eb7i stjup2-flutter-udm3tutq7eb7i stjup2-storj-udm3tutq7eb7i; do
+  az containerapp revision restart --name $app --resource-group rg-dev-storjup \
+    --revision $(az containerapp revision list --name $app --resource-group rg-dev-storjup --query "[?properties.active].name" -o tsv)
+done
+
+# 方法2: 新リビジョン作成
+for app in stjup2-backend-udm3tutq7eb7i stjup2-frontend-udm3tutq7eb7i stjup2-flutter-udm3tutq7eb7i stjup2-storj-udm3tutq7eb7i; do
+  az containerapp update --name $app --resource-group rg-dev-storjup --set-env-vars RESTART_TRIGGER="$(date +%s)"
+done
 ```
