@@ -131,6 +131,21 @@ class StatusResponse {
   });
 
   factory StatusResponse.fromJson(Map<String, dynamic> json) {
+    bool _parseBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        if (lower == 'true' || lower == '1' || lower == 'yes' || lower == 'y') {
+          return true;
+        }
+        if (lower == 'false' || lower == '0' || lower == 'no' || lower == 'n') {
+          return false;
+        }
+      }
+      if (value is num) return value != 0;
+      return false;
+    }
+
     // Parse nested storj_status object
     final storjStatusJson = json['storj_status'] as Map<String, dynamic>?;
     final apiInfoJson = json['api_info'] as Map<String, dynamic>?;
@@ -142,15 +157,18 @@ class StatusResponse {
     // Extract values from nested structure
     final filesInTarget = storjStatusJson?['files_in_target'] ?? apiInfoJson?['files_in_target'] ?? 0;
     final filesUploaded = storjStatusJson?['files_uploaded'] ?? 0;
-    final storjAppAvailable = storjStatusJson?['storj_app_available'] ?? false;
+    final storjAppMode = storjStatusJson?['storj_app_mode']?.toString() ?? 'unknown';
+    final storjAppAvailable = _parseBool(storjStatusJson?['storj_app_available']);
+    final storjRunning = storjAppAvailable || storjAppMode == 'remote';
 
     print('DEBUG StatusResponse.fromJson: storjAppAvailable = $storjAppAvailable (type: ${storjAppAvailable.runtimeType})');
+    print('DEBUG StatusResponse.fromJson: storjAppMode = $storjAppMode');
 
     return StatusResponse(
       uploadQueueCount: filesInTarget is int ? filesInTarget : 0,
       totalUploaded: filesUploaded is int ? filesUploaded : 0,
       lastUploadTime: json['last_upload_time'] ?? '',
-      storjServiceRunning: storjAppAvailable is bool ? storjAppAvailable : false,
+      storjServiceRunning: storjRunning,
       statistics: json['statistics'] ?? {},
       apiInfo: apiInfoJson != null ? ApiInfo.fromJson(apiInfoJson) : null,
       storjStatus: storjStatusJson != null ? StorjStatus.fromJson(storjStatusJson) : null,
@@ -191,6 +209,7 @@ class ApiInfo {
 
 class StorjStatus {
   final bool storjAppAvailable;
+  final String storjAppMode;
   final String storjAppPath;
   final String uploadTargetDir;
   final String uploadedDir;
@@ -201,6 +220,7 @@ class StorjStatus {
 
   StorjStatus({
     required this.storjAppAvailable,
+    required this.storjAppMode,
     required this.storjAppPath,
     required this.uploadTargetDir,
     required this.uploadedDir,
@@ -213,6 +233,7 @@ class StorjStatus {
   factory StorjStatus.fromJson(Map<String, dynamic> json) {
     return StorjStatus(
       storjAppAvailable: json['storj_app_available'] ?? false,
+      storjAppMode: json['storj_app_mode']?.toString() ?? 'unknown',
       storjAppPath: json['storj_app_path'] ?? '',
       uploadTargetDir: json['upload_target_dir'] ?? '',
       uploadedDir: json['uploaded_dir'] ?? '',

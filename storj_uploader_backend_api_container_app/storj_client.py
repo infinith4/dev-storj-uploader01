@@ -263,8 +263,22 @@ class StorjClient:
 
             storj_app_local = self.check_storj_app_available()
             cloud_env = os.getenv("CLOUD_ENV", "").lower()
-            storj_app_available = bool(storj_app_local or (self.blob_helper and cloud_env == "azure"))
-            storj_app_mode = "local" if storj_app_local else ("blob" if self.blob_helper else "unknown")
+            storj_remote_configured = bool(os.getenv("STORJ_CONTAINER_URL", "").strip())
+
+            storj_app_available = bool(
+                storj_app_local
+                or storj_remote_configured
+                or (self.blob_helper and cloud_env == "azure")
+            )
+
+            if storj_app_local:
+                storj_app_mode = "local"
+            elif storj_remote_configured:
+                storj_app_mode = "remote"
+            elif self.blob_helper and cloud_env == "azure":
+                storj_app_mode = "blob"
+            else:
+                storj_app_mode = "unknown"
 
             return {
                 "storj_app_available": storj_app_available,

@@ -133,6 +133,15 @@ class SystemStatusCard extends StatelessWidget {
       children: [
         _buildDetailRow(
           context,
+          'Service Mode',
+          _formatServiceMode(status!.storjStatus?.storjAppMode),
+          Icons.settings_remote,
+          status!.storjServiceRunning
+              ? const Color(UIConstants.successColorValue)
+              : Colors.grey.shade600,
+        ),
+        _buildDetailRow(
+          context,
           'Upload Queue',
           '${status!.uploadQueueCount} files',
           Icons.queue,
@@ -320,6 +329,20 @@ class SystemStatusCard extends StatelessWidget {
       }
     } catch (e) {
       return lastUploadTime;
+    }
+  }
+
+  String _formatServiceMode(String? mode) {
+    if (mode == null || mode.isEmpty) return 'Unknown';
+    switch (mode.toLowerCase()) {
+      case 'local':
+        return 'Local';
+      case 'remote':
+        return 'Remote (HTTP)';
+      case 'blob':
+        return 'Azure Blob';
+      default:
+        return mode;
     }
   }
 

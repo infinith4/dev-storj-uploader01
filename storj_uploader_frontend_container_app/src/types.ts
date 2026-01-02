@@ -39,6 +39,7 @@ export interface ApiInfo {
 
 export interface StorjStatus {
   storj_app_available: boolean;
+  storj_app_mode: 'local' | 'remote' | 'blob' | 'unknown';
   storj_app_path: string;
   upload_target_dir: string;
   uploaded_dir: string;
