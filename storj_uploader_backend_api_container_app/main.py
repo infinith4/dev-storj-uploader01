@@ -547,17 +547,18 @@ async def save_file_to_target(file_path: Path, target_path: Path):
 
                 if success:
                     print(f"✓ Thumbnail generated: {thumbnail_filename}")
-                    # サムネイルをBlob Storageのuploadedコンテナにアップロード
+                    # サムネイルをBlob Storageのupload-targetコンテナにアップロード
+                    # storj_container_appがStorjにアップロードする
                     if blob_helper:
                         try:
-                            # uploadedコンテナに保存（ギャラリーが参照するコンテナ）
-                            uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+                            # upload-targetコンテナに保存（storj_uploaderが処理する）
+                            upload_container = os.getenv("AZURE_STORAGE_UPLOAD_CONTAINER", "upload-target")
                             blob_helper.upload_file(
                                 str(thumbnail_path),
                                 thumbnail_filename,
-                                container_name=uploaded_container
+                                container_name=upload_container
                             )
-                            print(f"✓ Thumbnail uploaded to Blob Storage ({uploaded_container}): {thumbnail_filename}")
+                            print(f"✓ Thumbnail uploaded to Blob Storage ({upload_container}): {thumbnail_filename}")
                             thumbnail_path.unlink()  # アップロード後削除
                         except Exception as thumb_upload_error:
                             print(f"⚠ Failed to upload thumbnail to Blob: {thumb_upload_error}")
