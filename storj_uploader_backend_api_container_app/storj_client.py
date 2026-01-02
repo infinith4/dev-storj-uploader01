@@ -263,7 +263,7 @@ class StorjClient:
 
             storj_app_local = self.check_storj_app_available()
             cloud_env = os.getenv("CLOUD_ENV", "").lower()
-            storj_app_available = storj_app_local or (self.blob_helper and cloud_env == "azure")
+            storj_app_available = bool(storj_app_local or (self.blob_helper and cloud_env == "azure"))
             storj_app_mode = "local" if storj_app_local else ("blob" if self.blob_helper else "unknown")
 
             return {
