@@ -2,6 +2,11 @@ name: Build and Push Images to ACR
 
 on:
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "ACR image tag to push/update (e.g. v2026.01.01)"
+        required: false
+        default: "latest"
   push:
     branches:
       [
@@ -25,6 +30,7 @@ env:
   ACR_NAME: ${{ vars.ACR_NAME }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || 'latest' }}
 
 jobs:
   build-and-push:
@@ -84,7 +90,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --tag "$ACR_LOGIN_SERVER/${{ matrix.name }}:latest" \
+            --tag "$ACR_LOGIN_SERVER/${{ matrix.name }}:${IMAGE_TAG}" \
             --push \
             "${{ matrix.context }}"
 
@@ -130,13 +136,13 @@ jobs:
           fi
 
           echo "✓ Found Container App: $CONTAINER_APP_NAME"
-          echo "Updating with image: $ACR_LOGIN_SERVER/${{ matrix.name }}:latest"
+          echo "Updating with image: $ACR_LOGIN_SERVER/${{ matrix.name }}:${IMAGE_TAG}"
 
           # Container Appのイメージを更新
           az containerapp update \
             --name "$CONTAINER_APP_NAME" \
             --resource-group $RESOURCE_GROUP \
-            --image "$ACR_LOGIN_SERVER/${{ matrix.name }}:latest" \
+            --image "$ACR_LOGIN_SERVER/${{ matrix.name }}:${IMAGE_TAG}" \
             --output table
 
           echo "✓ Container App updated successfully"
