@@ -5,7 +5,7 @@ Storj Uploader Backend API
 FastAPI + OpenAPI v3対応のファイルアップロードAPI
 HEICやJPEGなどの画像ファイル、動画ファイル、その他すべてのファイル形式に対応
 """
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Body
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -28,7 +28,8 @@ from video_processor import VideoProcessor
 from models import (
     UploadResponse, HealthResponse, StatusResponse, TriggerUploadResponse,
     ErrorResponse, FileUploadResult, FileInfo, FileStatus,
-    StorjImageListResponse, StorjImageItem, DeleteMediaRequest, DeleteMediaResponse
+    StorjImageListResponse, StorjImageItem, DeleteMediaRequest, DeleteMediaResponse,
+    UploadStatusResponse
 )
 
 VIDEO_MIME_TYPES = {
@@ -450,6 +451,7 @@ app.add_middleware(
 
 # 設定
 UPLOAD_TARGET_DIR = storj_client.get_upload_target_dir()
+UPLOADED_DIR = storj_client.get_uploaded_dir()
 TEMP_DIR = Path(os.getenv('TEMP_DIR', './temp'))
 MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', '100000000'))  # 100MB
 SUPPORTED_IMAGE_FORMATS = {'jpeg', 'jpg', 'png', 'heic', 'heif', 'webp', 'bmp', 'tiff'}
@@ -458,6 +460,7 @@ MIRROR_BLOB_TO_LOCAL = os.getenv('MIRROR_BLOB_TO_LOCAL', 'true').lower() == 'tru
 # ディレクトリ作成
 UPLOAD_TARGET_DIR.mkdir(exist_ok=True, parents=True)
 TEMP_DIR.mkdir(exist_ok=True, parents=True)
+UPLOADED_DIR.mkdir(exist_ok=True, parents=True)
 
 # 並列処理用ThreadPoolExecutor（Blob Storage I/O用）
 UPLOAD_WORKERS = int(os.getenv('UPLOAD_WORKERS', '8'))
@@ -544,6 +547,32 @@ def _sync_generate_thumbnail(video_file_path: str, thumbnail_path: str, width: i
     """同期的にサムネイル生成（ThreadPoolExecutor用）"""
     return VideoProcessor.generate_thumbnail(video_file_path, thumbnail_path, width=width, height=height)
 
+def _file_status(name: str) -> str:
+    """
+    アップロード進捗ステータスを判定
+    queued: upload-targetに存在
+    uploaded: uploadedコンテナ/ディレクトリに存在
+    processing/unknown: どちらにもない
+    """
+    # Blob Storage優先
+    if blob_helper:
+        upload_container = os.getenv("AZURE_STORAGE_UPLOAD_CONTAINER", "upload-target")
+        uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+        try:
+            if blob_helper.blob_exists(name, container_name=uploaded_container):
+                return "uploaded"
+            if blob_helper.blob_exists(name, container_name=upload_container):
+                return "queued"
+        except Exception:
+            pass
+
+    # ローカルチェック
+    if (UPLOAD_TARGET_DIR / name).exists():
+        return "queued"
+    if (UPLOADED_DIR / name).exists():
+        return "uploaded"
+
+    return "processing"
 
 async def save_file_to_target(file_path: Path, target_path: Path):
     """ファイルをターゲットディレクトリに移動し、必要に応じてアップロードをトリガー"""
@@ -679,6 +708,20 @@ async def save_file_to_target(file_path: Path, target_path: Path):
         _log_file_status(filename, "BACKEND:ERROR", "error", str(e))
         if file_path.exists():
             file_path.unlink()
+
+@app.post(
+    "/upload/status",
+    response_model=UploadStatusResponse,
+    tags=["storj"],
+    summary="アップロード進捗ステータス取得",
+    description="upload処理後、storj_container_appによるアップロード完了までの状態を確認します。"
+)
+async def get_upload_status(files: List[str] = Body(..., embed=True, description="saved_as のリスト")):
+    statuses = []
+    for name in files:
+        status = _file_status(name)
+        statuses.append({"name": name, "status": status})
+    return {"statuses": statuses}
 
 @app.post(
     "/upload",

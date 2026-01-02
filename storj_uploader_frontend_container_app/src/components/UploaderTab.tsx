@@ -87,6 +87,51 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
     });
   }, []);
 
+  const pollStorjStatuses = async (savedAsList: string[]) => {
+    if (savedAsList.length === 0) return;
+
+    const maxAttempts = 30; // 約60秒
+    const intervalMs = 2000;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const statusMap = await StorjUploaderAPI.getUploadStatuses(savedAsList);
+        let allDone = true;
+
+        setFiles(prev => prev.map(f => {
+          if (!f.savedAs) return f;
+          const status = statusMap[f.savedAs];
+          if (!status) return f;
+          if (status === 'uploaded') {
+            return { ...f, status: 'success', progress: 100 };
+          }
+          if (status === 'queued' || status === 'processing') {
+            allDone = false;
+            return { ...f, status: 'processing', progress: Math.max(f.progress, 90) };
+          }
+          // unknown -> keep processing but allow loop to continue
+          allDone = false;
+          return { ...f, status: 'processing', progress: Math.max(f.progress, 90) };
+        }));
+
+        if (allDone) return;
+      } catch (error) {
+        console.error('Status polling error:', error);
+        // 失敗時はリトライ
+      }
+
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+
+    // タイムアウト時は処理中を成功扱いに
+    setFiles(prev => prev.map(f => {
+      if (f.status === 'processing') {
+        return { ...f, status: 'success', progress: 100 };
+      }
+      return f;
+    }));
+  };
+
   const uploadFiles = async () => {
     const pendingFiles = files.filter(f => f.status === 'pending');
     if (pendingFiles.length === 0) return;
@@ -94,6 +139,7 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
     setIsUploading(true);
 
     try {
+      const processingNames: string[] = [];
       const updateFile = (id: string, updater: (f: UploadFile) => UploadFile) => {
         setFiles(prev => prev.map(f => f.id === id ? updater(f) : f));
       };
@@ -112,12 +158,24 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
 
           const result = response.results?.[0];
           if (result) {
-            updateFile(pending.id, (f) => ({
-              ...f,
-              status: result.status === 'error' ? 'error' : 'success',
-              progress: 100,
-              result,
-            }));
+            if (result.status !== 'error' && result.saved_as) {
+              updateFile(pending.id, (f) => ({
+                ...f,
+                status: 'processing',
+                progress: Math.max(f.progress, 90),
+                result,
+                savedAs: result.saved_as,
+              }));
+              processingNames.push(result.saved_as);
+            } else {
+              updateFile(pending.id, (f) => ({
+                ...f,
+                status: result.status === 'error' ? 'error' : 'success',
+                progress: 100,
+                result,
+                savedAs: result.saved_as || f.savedAs,
+              }));
+            }
           } else {
             updateFile(pending.id, (f) => ({
               ...f,
@@ -144,6 +202,9 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
           }));
         }
       }
+
+      // Storj反映完了をポーリング
+      await pollStorjStatuses(processingNames);
 
     } catch (error) {
       console.error('Upload error:', error);

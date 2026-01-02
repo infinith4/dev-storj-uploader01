@@ -22,6 +22,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'error':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case 'processing':
+        return <Clock className="w-5 h-5 text-orange-500 animate-spin" />;
       case 'uploading':
         return <Clock className="w-5 h-5 text-blue-500 animate-spin" />;
       default:
@@ -46,6 +48,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         return 'border-green-200 bg-green-50';
       case 'error':
         return 'border-red-200 bg-red-50';
+      case 'processing':
+        return 'border-orange-200 bg-orange-50';
       case 'uploading':
         return 'border-blue-200 bg-blue-50';
       default:
@@ -97,10 +101,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({
             {formatFileSize(file.file.size)} • {fileType}
           </p>
 
-          {file.status === 'uploading' && (
+          {(file.status === 'uploading' || file.status === 'processing') && (
             <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
               <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  file.status === 'processing' ? 'bg-orange-500' : 'bg-blue-500'
+                }`}
                 style={{ width: `${file.progress}%` }}
               />
             </div>
@@ -118,6 +124,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                 </p>
               )}
             </div>
+          )}
+          {file.status === 'processing' && !file.result && (
+            <p className="text-xs text-orange-700">Storj への反映待ち...</p>
           )}
         </div>
       </div>

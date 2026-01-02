@@ -3,7 +3,7 @@
 OpenAPI v3対応のPydanticモデル定義
 """
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from enum import Enum
 
 class FileStatus(str, Enum):
@@ -146,6 +146,15 @@ class TriggerUploadResponse(BaseModel):
                 "output": "Successfully uploaded 5 files to Storj"
             }
         }
+
+class UploadStatusItem(BaseModel):
+    """アップロード進捗ステータス"""
+    name: str = Field(..., description="保存名（saved_as）")
+    status: Literal['queued', 'processing', 'uploaded', 'unknown'] = Field(..., description="ステータス")
+
+class UploadStatusResponse(BaseModel):
+    """アップロード進捗レスポンス"""
+    statuses: List[UploadStatusItem] = Field(..., description="ファイルごとのステータス")
 
 class ErrorResponse(BaseModel):
     """エラーレスポンスモデル"""

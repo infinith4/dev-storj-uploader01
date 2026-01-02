@@ -176,6 +176,18 @@ export class StorjUploaderAPI {
     }
     return `${API_BASE_URL}/storj/images/${imagePath}?${params.toString()}`;
   }
+
+  // アップロード進捗取得（storj_container_app完了まで）
+  static async getUploadStatuses(savedAs: string[]): Promise<Record<string, string>> {
+    const response = await api.post<{ statuses: { name: string; status: string }[] }>('/upload/status', {
+      files: savedAs
+    });
+    const map: Record<string, string> = {};
+    response.data.statuses.forEach((item) => {
+      map[item.name] = item.status;
+    });
+    return map;
+  }
 }
 
 // ファイルタイプ判定ユーティリティ
