@@ -68,7 +68,8 @@ export interface UploadFile {
   file: File;
   preview?: string | null;
   progress: number;
-  status: 'pending' | 'uploading' | 'success' | 'error';
+  status: 'pending' | 'uploading' | 'processing' | 'success' | 'error';
+  savedAs?: string;
   result?: FileUploadResult;
 }
 

@@ -43,6 +43,28 @@ api.interceptors.response.use(
 );
 
 export class StorjUploaderAPI {
+  private static async uploadWithProgress(
+    endpoint: string,
+    fieldName: 'file',
+    file: File,
+    onProgress?: (progress: number) => void
+  ): Promise<UploadResponse> {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+
+    const response = await api.post<UploadResponse>(endpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (event) => {
+        if (!event.total) return;
+        const progress = Math.round((event.loaded / event.total) * 100);
+        onProgress?.(progress);
+      },
+    });
+    return response.data;
+  }
+
   // 画像ファイル専用アップロード（複数）
   static async uploadImages(files: File[]): Promise<UploadResponse> {
     const formData = new FormData();
@@ -60,15 +82,15 @@ export class StorjUploaderAPI {
 
   // 画像ファイル専用アップロード（単一）
   static async uploadSingleImage(file: File): Promise<UploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
+    return this.uploadWithProgress('/upload/single', 'file', file);
+  }
 
-    const response = await api.post<UploadResponse>('/upload/single', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  // 画像ファイル専用アップロード（単一・プログレス付き）
+  static async uploadSingleImageWithProgress(
+    file: File,
+    onProgress?: (progress: number) => void
+  ): Promise<UploadResponse> {
+    return this.uploadWithProgress('/upload/single', 'file', file, onProgress);
   }
 
   // 汎用ファイルアップロード（複数）
@@ -88,15 +110,15 @@ export class StorjUploaderAPI {
 
   // 汎用ファイルアップロード（単一）
   static async uploadSingleFile(file: File): Promise<UploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
+    return this.uploadWithProgress('/upload/files/single', 'file', file);
+  }
 
-    const response = await api.post<UploadResponse>('/upload/files/single', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  // 汎用ファイルアップロード（単一・プログレス付き）
+  static async uploadSingleFileWithProgress(
+    file: File,
+    onProgress?: (progress: number) => void
+  ): Promise<UploadResponse> {
+    return this.uploadWithProgress('/upload/files/single', 'file', file, onProgress);
   }
 
   // ヘルスチェック
@@ -153,6 +175,18 @@ export class StorjUploaderAPI {
       params.append('bucket', bucket);
     }
     return `${API_BASE_URL}/storj/images/${imagePath}?${params.toString()}`;
+  }
+
+  // アップロード進捗取得（storj_container_app完了まで）
+  static async getUploadStatuses(savedAs: string[]): Promise<Record<string, string>> {
+    const response = await api.post<{ statuses: { name: string; status: string }[] }>('/upload/status', {
+      files: savedAs
+    });
+    const map: Record<string, string> = {};
+    response.data.statuses.forEach((item) => {
+      map[item.name] = item.status;
+    });
+    return map;
   }
 }
 

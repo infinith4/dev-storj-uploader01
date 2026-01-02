@@ -186,6 +186,7 @@ docker-compose up --build
 | AZURE_BLOB_UPLOAD_CONCURRENCY | 4 | Blobアップロードの並列度 |
 | AZURE_BLOB_DOWNLOAD_CONCURRENCY | 4 | Blobダウンロードの並列度 |
 | AZURE_BLOB_UPLOAD_BLOCK_SIZE_MB | 4 | Blobアップロードのブロックサイズ(MB) |
+| MIRROR_BLOB_TO_LOCAL | true | Blobアップロード後もローカル`upload_target`へ配置（Storj Containerがローカルモードでも拾えるように） |
 | API_HOST | 0.0.0.0 | APIサーバーホスト |
 | API_PORT | 8000 | APIサーバーポート |
 
