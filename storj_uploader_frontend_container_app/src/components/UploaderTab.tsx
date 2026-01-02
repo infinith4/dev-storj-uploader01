@@ -94,53 +94,56 @@ const UploaderTab: React.FC<UploaderTabProps> = ({
     setIsUploading(true);
 
     try {
-      // ファイルを一括でアップロード
-      const filesToUpload = pendingFiles.map(f => f.file);
+      const updateFile = (id: string, updater: (f: UploadFile) => UploadFile) => {
+        setFiles(prev => prev.map(f => f.id === id ? updater(f) : f));
+      };
 
-      // アップロード中のステータス更新
-      setFiles(prev => prev.map(f =>
-        pendingFiles.some(pf => pf.id === f.id)
-          ? { ...f, status: 'uploading' as const, progress: 50 }
-          : f
-      ));
+      for (const pending of pendingFiles) {
+        updateFile(pending.id, (f) => ({ ...f, status: 'uploading', progress: 0 }));
 
-      let response: UploadResponse;
-      if (type === 'image') {
-        response = filesToUpload.length === 1
-          ? await StorjUploaderAPI.uploadSingleImage(filesToUpload[0])
-          : await StorjUploaderAPI.uploadImages(filesToUpload);
-      } else {
-        response = filesToUpload.length === 1
-          ? await StorjUploaderAPI.uploadSingleFile(filesToUpload[0])
-          : await StorjUploaderAPI.uploadFiles(filesToUpload);
-      }
-
-      // 結果をファイルにマッピング
-      setFiles(prev => prev.map(f => {
-        const pendingFile = pendingFiles.find(pf => pf.id === f.id);
-        if (!pendingFile) return f;
-
-        const result = response.results.find(r => r.filename === pendingFile.file.name);
-        if (result) {
-          return {
-            ...f,
-            status: result.status as 'success' | 'error',
-            progress: 100,
-            result,
-          };
-        }
-
-        return {
-          ...f,
-          status: 'error' as const,
-          progress: 100,
-          result: {
-            filename: pendingFile.file.name,
-            status: 'error' as const,
-            message: 'アップロードに失敗しました',
-          },
+        const onProgress = (progress: number) => {
+          updateFile(pending.id, (f) => ({ ...f, progress, status: 'uploading' }));
         };
-      }));
+
+        try {
+          const response: UploadResponse = type === 'image'
+            ? await StorjUploaderAPI.uploadSingleImageWithProgress(pending.file, onProgress)
+            : await StorjUploaderAPI.uploadSingleFileWithProgress(pending.file, onProgress);
+
+          const result = response.results?.[0];
+          if (result) {
+            updateFile(pending.id, (f) => ({
+              ...f,
+              status: result.status === 'error' ? 'error' : 'success',
+              progress: 100,
+              result,
+            }));
+          } else {
+            updateFile(pending.id, (f) => ({
+              ...f,
+              status: 'error',
+              progress: 100,
+              result: {
+                filename: pending.file.name,
+                status: 'error',
+                message: 'アップロードに失敗しました',
+              },
+            }));
+          }
+        } catch (error) {
+          console.error('Upload error:', error);
+          updateFile(pending.id, (f) => ({
+            ...f,
+            status: 'error',
+            progress: 100,
+            result: {
+              filename: pending.file.name,
+              status: 'error',
+              message: 'ネットワークエラーが発生しました',
+            }
+          }));
+        }
+      }
 
     } catch (error) {
       console.error('Upload error:', error);
