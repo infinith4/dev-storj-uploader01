@@ -17,6 +17,7 @@ import tempfile
 from datetime import datetime
 import hashlib
 import aiofiles
+import threading
 from PIL import Image
 import io
 from dotenv import load_dotenv
@@ -39,6 +40,9 @@ VIDEO_MIME_TYPES = {
     ".flv": "video/x-flv",
     ".wmv": "video/x-ms-wmv"
 }
+
+_thumbnail_generation_lock = threading.Lock()
+_thumbnail_generation_in_progress: set[str] = set()
 
 
 def _parse_range_header(range_header: str, file_size: int):
@@ -201,6 +205,26 @@ def _generate_video_thumbnail(
             temp_video.unlink()
         if temp_thumb and temp_thumb.exists():
             temp_thumb.unlink()
+
+
+def _schedule_video_thumbnail_generation(video_path: str, bucket: str) -> None:
+    with _thumbnail_generation_lock:
+        if video_path in _thumbnail_generation_in_progress:
+            return
+        _thumbnail_generation_in_progress.add(video_path)
+
+    try:
+        success, _image_data, error_msg = _generate_video_thumbnail(
+            video_path=video_path,
+            bucket=bucket
+        )
+        if success:
+            print(f"✓ Video thumbnail generated in background: {video_path}")
+        else:
+            print(f"✗ Video thumbnail generation failed: {video_path} ({error_msg})")
+    finally:
+        with _thumbnail_generation_lock:
+            _thumbnail_generation_in_progress.discard(video_path)
 
 def _generate_image_thumbnail(image_data: bytes, size=(300, 300)) -> tuple:
     try:
@@ -1087,7 +1111,8 @@ async def get_storj_image(
     image_path: str,
     thumbnail: bool = True,
     bucket: str = None,
-    request: Request = None
+    request: Request = None,
+    background_tasks: BackgroundTasks = None
 ):
     """
     Storjから画像を取得して配信
@@ -1288,18 +1313,15 @@ async def get_storj_image(
                     bucket_name=bucket_name
                 )
                 if not success or not image_data:
-                    gen_success, gen_data, gen_error = _generate_video_thumbnail(
-                        video_path=image_path,
-                        bucket=bucket_name
-                    )
-                    if gen_success and gen_data:
-                        image_data = gen_data
-                        success = True
-                        error_msg = gen_error
-                    else:
-                        image_data = _generate_video_placeholder()
-                        success = True
-                        error_msg = f"Placeholder (thumbnail not found: {gen_error})"
+                    if background_tasks:
+                        background_tasks.add_task(
+                            _schedule_video_thumbnail_generation,
+                            image_path,
+                            bucket_name
+                        )
+                    image_data = _generate_video_placeholder()
+                    success = True
+                    error_msg = "Placeholder (thumbnail not found)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,
