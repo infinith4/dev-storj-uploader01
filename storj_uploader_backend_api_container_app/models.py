@@ -115,6 +115,7 @@ class ApiInfo(BaseModel):
 class StorjStatus(BaseModel):
     """Storjステータスモデル"""
     storj_app_available: bool = Field(..., description="Storj Container Appの利用可能性")
+    storj_app_mode: str = Field(..., description="Storj Container Appの動作モード (local/blob/remote/unknown)")
     storj_app_path: str = Field(..., description="Storj Container Appのパス")
     upload_target_dir: str = Field(..., description="アップロード対象ディレクトリ")
     uploaded_dir: str = Field(..., description="アップロード済みディレクトリ")

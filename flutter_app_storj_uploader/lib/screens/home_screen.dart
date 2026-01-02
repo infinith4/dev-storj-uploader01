@@ -328,6 +328,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     _buildStatItem('Storj Service', _systemStatus!.storjServiceRunning
                         ? 'Running'
                         : 'Stopped'),
+                    _buildStatItem('Service Mode', _systemStatus!.storjStatus?.storjAppMode ?? 'unknown'),
                   ] else
                     const Text('No statistics available'),
                 ],
