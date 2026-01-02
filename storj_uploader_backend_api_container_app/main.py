@@ -458,6 +458,10 @@ SUPPORTED_IMAGE_FORMATS = {'jpeg', 'jpg', 'png', 'heic', 'heif', 'webp', 'bmp', 
 UPLOAD_TARGET_DIR.mkdir(exist_ok=True, parents=True)
 TEMP_DIR.mkdir(exist_ok=True, parents=True)
 
+# 並列処理用ThreadPoolExecutor（Blob Storage I/O用）
+UPLOAD_WORKERS = int(os.getenv('UPLOAD_WORKERS', '8'))
+blob_executor = ThreadPoolExecutor(max_workers=UPLOAD_WORKERS)
+
 class ImageProcessor:
     """画像処理クラス"""
 
@@ -519,43 +523,80 @@ class FileProcessor:
             "size_mb": round(file_size / (1024 * 1024), 2)
         }
 
+def _log_file_status(filename: str, stage: str, status: str, details: str = ""):
+    """ファイル処理状況をログ出力"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    status_icon = "✓" if status == "success" else "✗" if status == "error" else "→" if status == "processing" else "⏳"
+    detail_str = f" ({details})" if details else ""
+    print(f"[{timestamp}] [{status_icon}] [{stage}] {filename}{detail_str}")
+
+
+def _sync_upload_to_blob(file_path: Path, blob_name: str, container_name: str = None):
+    """同期的にBlobにアップロード（ThreadPoolExecutor用）"""
+    if container_name:
+        blob_helper.upload_file(str(file_path), blob_name, container_name=container_name)
+    else:
+        blob_helper.upload_file(str(file_path), blob_name)
+
+
+def _sync_generate_thumbnail(video_file_path: str, thumbnail_path: str, width: int, height: int):
+    """同期的にサムネイル生成（ThreadPoolExecutor用）"""
+    return VideoProcessor.generate_thumbnail(video_file_path, thumbnail_path, width=width, height=height)
+
+
 async def save_file_to_target(file_path: Path, target_path: Path):
     """ファイルをターゲットディレクトリに移動し、必要に応じてアップロードをトリガー"""
+    loop = asyncio.get_event_loop()
+    filename = target_path.name
     try:
         # Blob Storageが利用可能な場合はBlobにアップロード、そうでなければローカルに移動
         if blob_helper:
             try:
-                # Blobにアップロード
+                # Blobにアップロード（非同期）
                 blob_name = target_path.name
-                blob_helper.upload_file(str(file_path), blob_name)
-                print(f"✓ File uploaded to Blob Storage: {blob_name}")
+                _log_file_status(filename, "BACKEND:BLOB_UPLOAD", "processing", "uploading to Blob Storage")
+                await loop.run_in_executor(
+                    blob_executor,
+                    _sync_upload_to_blob,
+                    file_path,
+                    blob_name,
+                    None
+                )
+                _log_file_status(filename, "BACKEND:BLOB_UPLOAD", "success", "uploaded to upload-target container")
 
                 # アップロード後、ローカルファイルを削除
                 if file_path.exists():
                     file_path.unlink()
 
             except Exception as blob_error:
-                print(f"⚠ Blob Storage upload failed: {blob_error}")
-                print(f"  Falling back to local filesystem")
+                _log_file_status(filename, "BACKEND:BLOB_UPLOAD", "error", str(blob_error))
                 # フォールバック: ローカルファイルシステムに移動
-                shutil.move(str(file_path), str(target_path))
-                print(f"File moved to target directory: {target_path}")
+                await loop.run_in_executor(blob_executor, shutil.move, str(file_path), str(target_path))
+                _log_file_status(filename, "BACKEND:LOCAL_MOVE", "success", "moved to local target directory")
         else:
             # Blob Storageが利用不可の場合はローカルに移動
-            shutil.move(str(file_path), str(target_path))
-            print(f"File moved to target directory: {target_path}")
+            _log_file_status(filename, "BACKEND:LOCAL_MOVE", "processing", "moving to local directory")
+            await loop.run_in_executor(blob_executor, shutil.move, str(file_path), str(target_path))
+            _log_file_status(filename, "BACKEND:LOCAL_MOVE", "success", "moved to target directory")
 
         # 動画ファイルの場合、サムネイルを生成
         # Note: サムネイル生成はローカルファイルが必要なため、Blob Storageモードでは一時的にダウンロードが必要
         video_filename = target_path.name
         if VideoProcessor.is_video_file(video_filename):
-            print(f"Generating thumbnail for video: {video_filename}")
+            _log_file_status(filename, "BACKEND:THUMBNAIL", "processing", "generating video thumbnail")
             try:
+                temp_video_path = None
                 # Blob Storageからダウンロードしてサムネイル生成
                 if blob_helper and blob_helper.blob_exists(video_filename):
-                    # 一時ファイルにダウンロード
+                    # 一時ファイルにダウンロード（非同期）
                     temp_video_path = TEMP_DIR / video_filename
-                    blob_helper.download_file(video_filename, str(temp_video_path))
+                    _log_file_status(filename, "BACKEND:THUMBNAIL", "processing", "downloading from Blob for thumbnail")
+                    await loop.run_in_executor(
+                        blob_executor,
+                        blob_helper.download_file,
+                        video_filename,
+                        str(temp_video_path)
+                    )
                     video_file_path = temp_video_path
                 else:
                     # ローカルファイルを使用
@@ -566,49 +607,54 @@ async def save_file_to_target(file_path: Path, target_path: Path):
                 thumbnail_filename = f"{video_stem}_thumb.jpg"
                 thumbnail_path = TEMP_DIR / thumbnail_filename
 
-                # サムネイル生成
-                success = VideoProcessor.generate_thumbnail(
+                # サムネイル生成（非同期）
+                success = await loop.run_in_executor(
+                    blob_executor,
+                    _sync_generate_thumbnail,
                     str(video_file_path),
                     str(thumbnail_path),
-                    width=320,
-                    height=240
+                    320,
+                    240
                 )
 
                 if success:
-                    print(f"✓ Thumbnail generated: {thumbnail_filename}")
+                    _log_file_status(thumbnail_filename, "BACKEND:THUMBNAIL", "success", "thumbnail generated")
                     # サムネイルをBlob Storageのupload-targetコンテナにアップロード
                     # storj_container_appがStorjにアップロードする
                     if blob_helper:
                         try:
                             # upload-targetコンテナに保存（storj_uploaderが処理する）
                             upload_container = os.getenv("AZURE_STORAGE_UPLOAD_CONTAINER", "upload-target")
-                            blob_helper.upload_file(
-                                str(thumbnail_path),
+                            _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "processing", "uploading thumbnail to Blob")
+                            await loop.run_in_executor(
+                                blob_executor,
+                                _sync_upload_to_blob,
+                                thumbnail_path,
                                 thumbnail_filename,
-                                container_name=upload_container
+                                upload_container
                             )
-                            print(f"✓ Thumbnail uploaded to Blob Storage ({upload_container}): {thumbnail_filename}")
+                            _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "success", f"uploaded to {upload_container}")
                             thumbnail_path.unlink()  # アップロード後削除
                         except Exception as thumb_upload_error:
-                            print(f"⚠ Failed to upload thumbnail to Blob: {thumb_upload_error}")
+                            _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "error", str(thumb_upload_error))
                 else:
-                    print(f"✗ Failed to generate thumbnail for: {video_filename}")
+                    _log_file_status(filename, "BACKEND:THUMBNAIL", "error", "failed to generate thumbnail")
 
                 # 一時ダウンロードしたファイルを削除
-                if blob_helper and temp_video_path.exists():
+                if temp_video_path and temp_video_path.exists():
                     temp_video_path.unlink()
 
             except Exception as thumb_error:
-                print(f"Error generating thumbnail: {thumb_error}")
+                _log_file_status(filename, "BACKEND:THUMBNAIL", "error", str(thumb_error))
 
         # ファイル数が5個以上になったら自動的にアップロードを実行
         file_count = storj_client.count_files_in_target()
         if file_count >= 5:
-            print(f"Auto-triggering upload for {file_count} files")
+            _log_file_status("*", "BACKEND:AUTO_TRIGGER", "processing", f"triggering Storj upload for {file_count} files")
             storj_client.run_storj_uploader_async()
 
     except Exception as e:
-        print(f"Error moving file to target: {e}")
+        _log_file_status(filename, "BACKEND:ERROR", "error", str(e))
         if file_path.exists():
             file_path.unlink()
 
@@ -648,43 +694,41 @@ async def upload_images(
 ):
     """
     画像ファイルをアップロードして、storj_container_appでの処理キューに追加
+    複数ファイルを並列処理
     """
     if not files:
         raise HTTPException(status_code=400, detail="ファイルが指定されていません")
 
-    results = []
-
-    for file in files:
+    async def process_single_image(file: UploadFile) -> dict:
+        """単一画像ファイルを処理"""
+        _log_file_status(file.filename, "BACKEND:RECEIVE", "processing", f"size={file.size or 'unknown'}")
         try:
             # ファイルサイズチェック
             if file.size and file.size > MAX_FILE_SIZE:
-                results.append({
+                return {
                     "filename": file.filename,
                     "status": "error",
                     "message": f"ファイルサイズが上限({MAX_FILE_SIZE / (1024*1024):.1f}MB)を超えています"
-                })
-                continue
+                }
 
             # ファイル形式チェック
             if not ImageProcessor.is_supported_format(file.filename):
-                results.append({
+                return {
                     "filename": file.filename,
                     "status": "error",
                     "message": "サポートされていない画像形式です"
-                })
-                continue
+                }
 
             # ファイル内容を読み取り
             content = await file.read()
 
             # 画像検証
             if not ImageProcessor.validate_image(content):
-                results.append({
+                return {
                     "filename": file.filename,
                     "status": "error",
                     "message": "有効な画像ファイルではありません"
-                })
-                continue
+                }
 
             # 一意のファイル名生成
             unique_filename = ImageProcessor.generate_unique_filename(file.filename)
@@ -695,22 +739,27 @@ async def upload_images(
             async with aiofiles.open(temp_path, 'wb') as f:
                 await f.write(content)
 
-            # バックグラウンドタスクでターゲットディレクトリに移動
-            background_tasks.add_task(save_file_to_target, temp_path, target_path)
+            # 非同期でBlob Storageにアップロード
+            await save_file_to_target(temp_path, target_path)
 
-            results.append({
+            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"saved as {unique_filename}")
+            return {
                 "filename": file.filename,
                 "saved_as": unique_filename,
                 "status": "success",
                 "message": "アップロード完了、処理キューに追加されました"
-            })
+            }
 
         except Exception as e:
-            results.append({
+            _log_file_status(file.filename, "BACKEND:ERROR", "error", str(e))
+            return {
                 "filename": file.filename,
                 "status": "error",
                 "message": f"処理エラー: {str(e)}"
-            })
+            }
+
+    # 複数ファイルを並列処理
+    results = await asyncio.gather(*[process_single_image(file) for file in files])
 
     return {
         "message": f"{len([r for r in results if r['status'] == 'success'])}個のファイルが正常にアップロードされました",
@@ -775,36 +824,35 @@ async def upload_files(
     """
     汎用ファイルアップロード（動画・その他すべてのファイル形式対応）
     ファイル形式の制限なし
+    複数ファイルを並列処理
     """
     if not files:
         raise HTTPException(status_code=400, detail="ファイルが指定されていません")
 
-    results = []
-
-    for file in files:
+    async def process_single_file(file: UploadFile) -> dict:
+        """単一ファイルを処理"""
+        _log_file_status(file.filename, "BACKEND:RECEIVE", "processing", f"size={file.size or 'unknown'}")
         try:
             # ファイルサイズチェック
             if file.size and file.size > MAX_FILE_SIZE:
-                results.append({
+                return {
                     "filename": file.filename,
                     "status": "error",
                     "message": f"ファイルサイズが上限({MAX_FILE_SIZE / (1024*1024):.1f}MB)を超えています",
                     "file_info": FileProcessor.get_file_info(file.filename, file.size)
-                })
-                continue
+                }
 
             # ファイル内容を読み取り
             content = await file.read()
 
             # 基本的なファイル検証（形式制限なし）
             if not FileProcessor.validate_file_basic(content, file.filename):
-                results.append({
+                return {
                     "filename": file.filename,
                     "status": "error",
                     "message": "無効なファイルです（空ファイルまたは無効なファイル名）",
                     "file_info": FileProcessor.get_file_info(file.filename, len(content))
-                })
-                continue
+                }
 
             # 一意のファイル名生成
             unique_filename = FileProcessor.generate_unique_filename(file.filename)
@@ -818,24 +866,29 @@ async def upload_files(
             async with aiofiles.open(temp_path, 'wb') as f:
                 await f.write(content)
 
-            # バックグラウンドタスクでターゲットディレクトリに移動
-            background_tasks.add_task(save_file_to_target, temp_path, target_path)
+            # 非同期でBlob Storageにアップロード（バックグラウンドではなく直接実行）
+            await save_file_to_target(temp_path, target_path)
 
-            results.append({
+            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"saved as {unique_filename}")
+            return {
                 "filename": file.filename,
                 "saved_as": unique_filename,
                 "status": "success",
                 "message": "アップロード完了、処理キューに追加されました",
                 "file_info": file_info
-            })
+            }
 
         except Exception as e:
-            results.append({
+            _log_file_status(file.filename, "BACKEND:ERROR", "error", str(e))
+            return {
                 "filename": file.filename,
                 "status": "error",
                 "message": f"処理エラー: {str(e)}",
                 "file_info": FileProcessor.get_file_info(file.filename, 0) if file.filename else {}
-            })
+            }
+
+    # 複数ファイルを並列処理
+    results = await asyncio.gather(*[process_single_file(file) for file in files])
 
     return {
         "message": f"{len([r for r in results if r['status'] == 'success'])}個のファイルが正常にアップロードされました",
