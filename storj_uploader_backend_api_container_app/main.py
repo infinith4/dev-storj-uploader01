@@ -17,6 +17,7 @@ import tempfile
 from datetime import datetime
 import hashlib
 import aiofiles
+import threading
 from PIL import Image
 import io
 from dotenv import load_dotenv
@@ -39,6 +40,9 @@ VIDEO_MIME_TYPES = {
     ".flv": "video/x-flv",
     ".wmv": "video/x-ms-wmv"
 }
+
+_thumbnail_generation_lock = threading.Lock()
+_thumbnail_generation_in_progress: set[str] = set()
 
 
 def _parse_range_header(range_header: str, file_size: int):
@@ -201,6 +205,26 @@ def _generate_video_thumbnail(
             temp_video.unlink()
         if temp_thumb and temp_thumb.exists():
             temp_thumb.unlink()
+
+
+def _schedule_video_thumbnail_generation(video_path: str, bucket: str) -> None:
+    with _thumbnail_generation_lock:
+        if video_path in _thumbnail_generation_in_progress:
+            return
+        _thumbnail_generation_in_progress.add(video_path)
+
+    try:
+        success, _image_data, error_msg = _generate_video_thumbnail(
+            video_path=video_path,
+            bucket=bucket
+        )
+        if success:
+            print(f"✓ Video thumbnail generated in background: {video_path}")
+        else:
+            print(f"✗ Video thumbnail generation failed: {video_path} ({error_msg})")
+    finally:
+        with _thumbnail_generation_lock:
+            _thumbnail_generation_in_progress.discard(video_path)
 
 def _generate_image_thumbnail(image_data: bytes, size=(300, 300)) -> tuple:
     try:
@@ -523,11 +547,17 @@ async def save_file_to_target(file_path: Path, target_path: Path):
 
                 if success:
                     print(f"✓ Thumbnail generated: {thumbnail_filename}")
-                    # サムネイルもBlobにアップロード
+                    # サムネイルをBlob Storageのuploadedコンテナにアップロード
                     if blob_helper:
                         try:
-                            blob_helper.upload_file(str(thumbnail_path), thumbnail_filename)
-                            print(f"✓ Thumbnail uploaded to Blob Storage: {thumbnail_filename}")
+                            # uploadedコンテナに保存（ギャラリーが参照するコンテナ）
+                            uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+                            blob_helper.upload_file(
+                                str(thumbnail_path),
+                                thumbnail_filename,
+                                container_name=uploaded_container
+                            )
+                            print(f"✓ Thumbnail uploaded to Blob Storage ({uploaded_container}): {thumbnail_filename}")
                             thumbnail_path.unlink()  # アップロード後削除
                         except Exception as thumb_upload_error:
                             print(f"⚠ Failed to upload thumbnail to Blob: {thumb_upload_error}")
@@ -1087,7 +1117,8 @@ async def get_storj_image(
     image_path: str,
     thumbnail: bool = True,
     bucket: str = None,
-    request: Request = None
+    request: Request = None,
+    background_tasks: BackgroundTasks = None
 ):
     """
     Storjから画像を取得して配信
@@ -1158,24 +1189,35 @@ async def get_storj_image(
 
             if thumbnail:
                 if is_video:
-                    # Thumbnail is in thumbnails/YYYYMM/ directory
+                    # Try multiple thumbnail path formats
                     path_obj = Path(image_path)
                     dir_name = path_obj.parent.name  # YYYYMM
                     file_stem = path_obj.stem  # filename without extension
-                    thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
-                    if blob_helper.blob_exists(
-                        thumbnail_path,
-                        container_name=container_name
-                    ):
-                        image_data = blob_helper.download_blob_to_bytes(
-                            blob_name=thumbnail_path,
-                            container_name=container_name
-                        )
-                        success = bool(image_data)
-                        error_msg = "Success" if success else "Thumbnail is empty"
-                    else:
+
+                    # Candidate paths to check (in order of preference)
+                    thumbnail_candidates = [
+                        f"{file_stem}_thumb.jpg",  # New format: flat in uploaded container
+                        f"thumbnails/{dir_name}/{file_stem}_thumb.jpg",  # Old format: in thumbnails subdirectory
+                    ]
+
+                    thumbnail_found = False
+                    for thumbnail_path in thumbnail_candidates:
+                        if blob_helper.blob_exists(thumbnail_path, container_name=container_name):
+                            image_data = blob_helper.download_blob_to_bytes(
+                                blob_name=thumbnail_path,
+                                container_name=container_name
+                            )
+                            if image_data:
+                                success = True
+                                error_msg = f"Success (path: {thumbnail_path})"
+                                thumbnail_found = True
+                                print(f"✓ Video thumbnail found: {thumbnail_path}")
+                                break
+
+                    if not thumbnail_found:
                         # Return placeholder instead of generating thumbnail on-demand
                         # On-demand generation is too slow and causes timeouts
+                        print(f"⚠ Video thumbnail not found, returning placeholder for: {image_path}")
                         image_data = _generate_video_placeholder()
                         success = True
                         error_msg = "Placeholder (thumbnail not found)"
@@ -1288,18 +1330,15 @@ async def get_storj_image(
                     bucket_name=bucket_name
                 )
                 if not success or not image_data:
-                    gen_success, gen_data, gen_error = _generate_video_thumbnail(
-                        video_path=image_path,
-                        bucket=bucket_name
-                    )
-                    if gen_success and gen_data:
-                        image_data = gen_data
-                        success = True
-                        error_msg = gen_error
-                    else:
-                        image_data = _generate_video_placeholder()
-                        success = True
-                        error_msg = f"Placeholder (thumbnail not found: {gen_error})"
+                    if background_tasks:
+                        background_tasks.add_task(
+                            _schedule_video_thumbnail_generation,
+                            image_path,
+                            bucket_name
+                        )
+                    image_data = _generate_video_placeholder()
+                    success = True
+                    error_msg = "Placeholder (thumbnail not found)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,
