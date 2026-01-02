@@ -1191,14 +1191,19 @@ async def get_storj_image(
                 if is_video:
                     # Try multiple thumbnail path formats
                     path_obj = Path(image_path)
+                    parent_dir = str(path_obj.parent)  # e.g., "202601" or "."
                     dir_name = path_obj.parent.name  # YYYYMM
                     file_stem = path_obj.stem  # filename without extension
 
                     # Candidate paths to check (in order of preference)
-                    thumbnail_candidates = [
-                        f"{file_stem}_thumb.jpg",  # New format: flat in uploaded container
-                        f"thumbnails/{dir_name}/{file_stem}_thumb.jpg",  # Old format: in thumbnails subdirectory
-                    ]
+                    thumbnail_candidates = []
+                    # 1. Same directory as the video (most common)
+                    if parent_dir and parent_dir != ".":
+                        thumbnail_candidates.append(f"{parent_dir}/{file_stem}_thumb.jpg")
+                    # 2. Flat in container root
+                    thumbnail_candidates.append(f"{file_stem}_thumb.jpg")
+                    # 3. Legacy thumbnails subdirectory format
+                    thumbnail_candidates.append(f"thumbnails/{dir_name}/{file_stem}_thumb.jpg")
 
                     thumbnail_found = False
                     for thumbnail_path in thumbnail_candidates:
