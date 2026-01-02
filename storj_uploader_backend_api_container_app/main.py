@@ -18,6 +18,8 @@ from datetime import datetime
 import hashlib
 import aiofiles
 import threading
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 import io
 from dotenv import load_dotenv
@@ -152,7 +154,24 @@ def _generate_video_thumbnail(
     cache_filename = video_path.replace("/", "_").replace("\\", "_")
     cache_path = cache_dir / cache_filename
 
+    path_obj = Path(video_path)
+    dir_name = path_obj.parent.name
+    file_stem = path_obj.stem
+    if dir_name:
+        thumb_remote_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
+    else:
+        thumb_remote_path = f"thumbnails/{file_stem}_thumb.jpg"
+
     if cache_path.exists() and cache_path.stat().st_size > 0:
+        upload_success, upload_error = storj_client.upload_storj_file(
+            local_path=cache_path,
+            remote_path=thumb_remote_path,
+            bucket_name=bucket
+        )
+        if upload_success:
+            print(f"✓ Thumbnail uploaded to Storj (cache): {thumb_remote_path}")
+        else:
+            print(f"⚠ Failed to upload thumbnail to Storj (cache): {upload_error}")
         return True, cache_path.read_bytes(), "Success (cached)"
 
     temp_dir = Path(os.getenv("TEMP_DIR", "./temp"))
@@ -198,6 +217,16 @@ def _generate_video_thumbnail(
         with open(temp_cache_path, "wb") as cache_file:
             cache_file.write(thumb_data)
         temp_cache_path.replace(cache_path)
+
+        upload_success, upload_error = storj_client.upload_storj_file(
+            local_path=temp_thumb,
+            remote_path=thumb_remote_path,
+            bucket_name=bucket
+        )
+        if upload_success:
+            print(f"✓ Thumbnail uploaded to Storj: {thumb_remote_path}")
+        else:
+            print(f"⚠ Failed to upload thumbnail to Storj: {upload_error}")
 
         return True, thumb_data, "Success (generated)"
     finally:
@@ -547,17 +576,18 @@ async def save_file_to_target(file_path: Path, target_path: Path):
 
                 if success:
                     print(f"✓ Thumbnail generated: {thumbnail_filename}")
-                    # サムネイルをBlob Storageのuploadedコンテナにアップロード
+                    # サムネイルをBlob Storageのupload-targetコンテナにアップロード
+                    # storj_container_appがStorjにアップロードする
                     if blob_helper:
                         try:
-                            # uploadedコンテナに保存（ギャラリーが参照するコンテナ）
-                            uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+                            # upload-targetコンテナに保存（storj_uploaderが処理する）
+                            upload_container = os.getenv("AZURE_STORAGE_UPLOAD_CONTAINER", "upload-target")
                             blob_helper.upload_file(
                                 str(thumbnail_path),
                                 thumbnail_filename,
-                                container_name=uploaded_container
+                                container_name=upload_container
                             )
-                            print(f"✓ Thumbnail uploaded to Blob Storage ({uploaded_container}): {thumbnail_filename}")
+                            print(f"✓ Thumbnail uploaded to Blob Storage ({upload_container}): {thumbnail_filename}")
                             thumbnail_path.unlink()  # アップロード後削除
                         except Exception as thumb_upload_error:
                             print(f"⚠ Failed to upload thumbnail to Blob: {thumb_upload_error}")
@@ -1311,21 +1341,29 @@ async def get_storj_image(
                 path_obj = Path(image_path)
                 dir_name = path_obj.parent.name  # YYYYMM
                 file_stem = path_obj.stem  # filename without extension
-                thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
-                success, image_data, error_msg = storj_client.get_storj_image(
-                    image_path=thumbnail_path,
+                success, image_data, error_msg = storj_client.get_storj_thumbnail_by_prefix(
+                    video_stem=file_stem,
+                    dir_name=dir_name,
                     bucket_name=bucket_name
                 )
                 if not success or not image_data:
-                    if background_tasks:
-                        background_tasks.add_task(
-                            _schedule_video_thumbnail_generation,
-                            image_path,
-                            bucket_name
-                        )
-                    image_data = _generate_video_placeholder()
-                    success = True
-                    error_msg = "Placeholder (thumbnail not found)"
+                    thumbnail_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
+                    legacy_success, legacy_data, legacy_error = storj_client.get_storj_image(
+                        image_path=thumbnail_path,
+                        bucket_name=bucket_name
+                    )
+                    if legacy_success and legacy_data:
+                        success, image_data, error_msg = legacy_success, legacy_data, legacy_error
+                    else:
+                        if background_tasks:
+                            background_tasks.add_task(
+                                _schedule_video_thumbnail_generation,
+                                image_path,
+                                bucket_name
+                            )
+                        image_data = _generate_video_placeholder()
+                        success = True
+                        error_msg = "Placeholder (thumbnail not found)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,
