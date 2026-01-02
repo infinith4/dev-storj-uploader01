@@ -981,7 +981,17 @@ async def get_storj_images(
     Storjに保存されている画像リストを取得
     """
     try:
-        base_url = str(request.base_url).rstrip("/") if request else None
+        base_url = None
+        if request:
+            forwarded_proto = request.headers.get("x-forwarded-proto", "")
+            forwarded_host = request.headers.get("x-forwarded-host", "")
+            host = forwarded_host or request.headers.get("host", "")
+            if forwarded_proto and host:
+                scheme = forwarded_proto.split(",")[0].strip()
+                host = host.split(",")[0].strip()
+                base_url = f"{scheme}://{host}".rstrip("/")
+            else:
+                base_url = str(request.base_url).rstrip("/")
         success, images, message = storj_client.list_storj_images(
             bucket_name=bucket,
             limit=limit,

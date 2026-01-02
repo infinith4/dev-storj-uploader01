@@ -300,114 +300,146 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
+  Widget _buildDefaultThumbnail(StorjImageItem item, {bool isLoading = false}) {
+    final icon = item.isVideo ? Icons.videocam : Icons.image_outlined;
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: isLoading
+            ? const CircularProgressIndicator(strokeWidth: 2)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 28,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'No thumbnail',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     final videoCount = _images.where((item) => item.isVideo).length;
     final imageCount = _images.length - videoCount;
 
     return Padding(
       padding: const EdgeInsets.all(UIConstants.smallPadding),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: UIConstants.smallPadding,
-        runSpacing: UIConstants.smallPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            '$imageCount images • $videoCount videos • ${_images.length} total',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: UIConstants.smallPadding,
+            runSpacing: UIConstants.smallPadding,
             children: [
-              if (_isSelectionMode)
-                Text(
-                  '選択中: ${_selectedPaths.length}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                )
-              else
-                Text(
-                  'ソート',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              const SizedBox(width: UIConstants.smallPadding),
-              if (!_isSelectionMode)
-                PopupMenuButton<GallerySortOption>(
-                  tooltip: 'ソート',
-                  initialValue: _sortOption,
-                  onSelected: (value) {
-                    setState(() {
-                      _sortOption = value;
-                      _images = _sortImages(_images);
-                    });
-                  },
-                  itemBuilder: (context) {
-                    return GallerySortOption.values.map((option) {
-                      return CheckedPopupMenuItem<GallerySortOption>(
-                        value: option,
-                        checked: option == _sortOption,
-                        child: Text(_sortOptionLabel(option)),
-                      );
-                    }).toList();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _sortOptionLabel(_sortOption),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.expand_more,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              if (_isSelectionMode) ...[
-                TextButton(
-                  onPressed: _isDeleting ? null : () => _setSelectionMode(false),
-                  child: const Text('キャンセル'),
-                ),
-                IconButton(
-                  icon: _isDeleting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.delete_outline),
-                  onPressed: (!_isDeleting && _selectedPaths.isNotEmpty)
-                      ? _confirmDeleteSelected
-                      : null,
-                  tooltip: 'Delete',
-                  iconSize: 20,
-                ),
-              ] else ...[
-                TextButton(
-                  onPressed: _isDeleting ? null : () => _setSelectionMode(true),
-                  child: const Text('選択'),
-                ),
-              ],
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _isDeleting ? null : _loadImages,
-                tooltip: 'Refresh',
-                iconSize: 20,
+              Text(
+                '$imageCount images • $videoCount videos • ${_images.length} total',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Text(
+                _isSelectionMode ? '選択中: ${_selectedPaths.length}' : 'ソート',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
+          ),
+          const SizedBox(height: UIConstants.smallPadding),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: UIConstants.smallPadding,
+              runSpacing: UIConstants.smallPadding,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (!_isSelectionMode)
+                  PopupMenuButton<GallerySortOption>(
+                    tooltip: 'ソート',
+                    initialValue: _sortOption,
+                    onSelected: (value) {
+                      setState(() {
+                        _sortOption = value;
+                        _images = _sortImages(_images);
+                      });
+                    },
+                    itemBuilder: (context) {
+                      return GallerySortOption.values.map((option) {
+                        return CheckedPopupMenuItem<GallerySortOption>(
+                          value: option,
+                          checked: option == _sortOption,
+                          child: Text(_sortOptionLabel(option)),
+                        );
+                      }).toList();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _sortOptionLabel(_sortOption),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.expand_more,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_isSelectionMode) ...[
+                  TextButton(
+                    onPressed: _isDeleting ? null : () => _setSelectionMode(false),
+                    child: const Text('キャンセル'),
+                  ),
+                  IconButton(
+                    icon: _isDeleting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline),
+                    onPressed: (!_isDeleting && _selectedPaths.isNotEmpty)
+                        ? _confirmDeleteSelected
+                        : null,
+                    tooltip: 'Delete',
+                    iconSize: 20,
+                  ),
+                ] else ...[
+                  TextButton(
+                    onPressed: _isDeleting ? null : () => _setSelectionMode(true),
+                    child: const Text('選択'),
+                  ),
+                ],
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _isDeleting ? null : _loadImages,
+                  tooltip: 'Refresh',
+                  iconSize: 20,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -567,19 +599,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
           CachedNetworkImage(
             imageUrl: thumbnailUrl,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+            placeholder: (context, url) => _buildDefaultThumbnail(
+              item,
+              isLoading: true,
             ),
-            errorWidget: (context, url, error) => Container(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Icon(
-                item.isVideo ? Icons.videocam : Icons.image,
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
+            errorWidget: (context, url, error) => _buildDefaultThumbnail(item),
           ),
           if (_isSelectionMode && isSelected)
             Container(
