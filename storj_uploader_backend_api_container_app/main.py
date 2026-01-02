@@ -1189,43 +1189,25 @@ async def get_storj_image(
 
             if thumbnail:
                 if is_video:
-                    # Try multiple thumbnail path formats
+                    # Get video thumbnail from Storj (not Blob Storage)
+                    # Thumbnail format: thumbnails/YYYYMM/{file_stem}_thumb_{hash}.jpg
                     path_obj = Path(image_path)
-                    parent_dir = str(path_obj.parent)  # e.g., "202601" or "."
                     dir_name = path_obj.parent.name  # YYYYMM
                     file_stem = path_obj.stem  # filename without extension
 
-                    # Candidate paths to check (in order of preference)
-                    thumbnail_candidates = []
-                    # 1. Same directory as the video (most common)
-                    if parent_dir and parent_dir != ".":
-                        thumbnail_candidates.append(f"{parent_dir}/{file_stem}_thumb.jpg")
-                    # 2. Flat in container root
-                    thumbnail_candidates.append(f"{file_stem}_thumb.jpg")
-                    # 3. Legacy thumbnails subdirectory format
-                    thumbnail_candidates.append(f"thumbnails/{dir_name}/{file_stem}_thumb.jpg")
+                    # Use storj_client to get thumbnail from Storj
+                    success, image_data, error_msg = storj_client.get_storj_thumbnail_by_prefix(
+                        video_stem=file_stem,
+                        dir_name=dir_name,
+                        bucket_name=bucket
+                    )
 
-                    thumbnail_found = False
-                    for thumbnail_path in thumbnail_candidates:
-                        if blob_helper.blob_exists(thumbnail_path, container_name=container_name):
-                            image_data = blob_helper.download_blob_to_bytes(
-                                blob_name=thumbnail_path,
-                                container_name=container_name
-                            )
-                            if image_data:
-                                success = True
-                                error_msg = f"Success (path: {thumbnail_path})"
-                                thumbnail_found = True
-                                print(f"✓ Video thumbnail found: {thumbnail_path}")
-                                break
-
-                    if not thumbnail_found:
-                        # Return placeholder instead of generating thumbnail on-demand
-                        # On-demand generation is too slow and causes timeouts
-                        print(f"⚠ Video thumbnail not found, returning placeholder for: {image_path}")
+                    if not success or not image_data:
+                        # Return placeholder if thumbnail not found
+                        print(f"⚠ Video thumbnail not found in Storj, returning placeholder for: {image_path}")
                         image_data = _generate_video_placeholder()
                         success = True
-                        error_msg = "Placeholder (thumbnail not found)"
+                        error_msg = "Placeholder (thumbnail not found in Storj)"
                 else:
                     image_data = blob_helper.download_blob_to_bytes(
                         blob_name=image_path,

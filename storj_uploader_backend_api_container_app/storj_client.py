@@ -975,3 +975,114 @@ class StorjClient:
             except Exception as e:
                 print(f"Error in get_storj_thumbnail: {str(e)}")
                 return False, b"", str(e)
+
+    def get_storj_thumbnail_by_prefix(
+        self,
+        video_stem: str,
+        dir_name: str,
+        bucket_name: str = None
+    ) -> Tuple[bool, bytes, str]:
+        """
+        Storjからプレフィックスマッチでサムネイルを検索して取得
+        サムネイル形式: thumbnails/YYYYMM/{video_stem}_thumb_{hash}.jpg
+        Returns: (success: bool, thumbnail_data: bytes, error_message: str)
+        """
+        with self.rclone_semaphore:
+            try:
+                if bucket_name is None:
+                    bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+                remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+
+                env, error_message = self._get_rclone_env()
+                if error_message:
+                    return False, b"", error_message
+
+                # Search for thumbnail with prefix: thumbnails/YYYYMM/{video_stem}_thumb
+                thumbnail_prefix = f"thumbnails/{dir_name}/{video_stem}_thumb"
+                remote_path = f"{remote_name}:{bucket_name}/{thumbnail_prefix}"
+
+                # Use rclone lsf to find matching files
+                cmd = [
+                    "rclone", "lsf",
+                    remote_path,
+                    "--max-depth", "1"
+                ]
+
+                print(f"[{datetime.now()}] Searching for thumbnail with prefix: {thumbnail_prefix}")
+
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(self.storj_app_path),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                # Parse the result to find matching thumbnail files
+                matching_files = []
+                if result.returncode == 0 and result.stdout.strip():
+                    for line in result.stdout.strip().split('\n'):
+                        if line and line.endswith('.jpg'):
+                            # Full path: thumbnails/YYYYMM/{video_stem}_thumb_{hash}.jpg
+                            full_path = f"thumbnails/{dir_name}/{video_stem}_thumb{line}"
+                            matching_files.append(full_path)
+
+                if not matching_files:
+                    # Try alternative: list the thumbnails directory and filter
+                    alt_remote_path = f"{remote_name}:{bucket_name}/thumbnails/{dir_name}/"
+                    alt_cmd = [
+                        "rclone", "lsf",
+                        alt_remote_path,
+                        "--max-depth", "1"
+                    ]
+
+                    alt_result = subprocess.run(
+                        alt_cmd,
+                        cwd=str(self.storj_app_path),
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+
+                    if alt_result.returncode == 0 and alt_result.stdout.strip():
+                        for line in alt_result.stdout.strip().split('\n'):
+                            # Check if file matches {video_stem}_thumb pattern
+                            if line and line.startswith(f"{video_stem}_thumb") and line.endswith('.jpg'):
+                                full_path = f"thumbnails/{dir_name}/{line}"
+                                matching_files.append(full_path)
+
+                if not matching_files:
+                    print(f"[{datetime.now()}] No thumbnail found for prefix: {thumbnail_prefix}")
+                    return False, b"", "Thumbnail not found"
+
+                # Get the first matching thumbnail
+                thumbnail_path = matching_files[0]
+                print(f"[{datetime.now()}] Found thumbnail: {thumbnail_path}")
+
+                # Fetch the thumbnail
+                fetch_remote_path = f"{remote_name}:{bucket_name}/{thumbnail_path}"
+                fetch_cmd = ["rclone", "cat", fetch_remote_path]
+
+                fetch_result = subprocess.run(
+                    fetch_cmd,
+                    cwd=str(self.storj_app_path),
+                    env=env,
+                    capture_output=True,
+                    timeout=60
+                )
+
+                if fetch_result.returncode == 0 and len(fetch_result.stdout) > 0:
+                    print(f"[{datetime.now()}] Successfully fetched thumbnail from Storj: {len(fetch_result.stdout)} bytes")
+                    return True, fetch_result.stdout, f"Success (path: {thumbnail_path})"
+                else:
+                    error_msg = fetch_result.stderr.decode('utf-8') if fetch_result.stderr else "Unknown error"
+                    print(f"[{datetime.now()}] Failed to fetch thumbnail: {error_msg}")
+                    return False, b"", error_msg
+
+            except subprocess.TimeoutExpired:
+                return False, b"", "rclone command timed out"
+            except Exception as e:
+                print(f"Error in get_storj_thumbnail_by_prefix: {str(e)}")
+                return False, b"", str(e)
