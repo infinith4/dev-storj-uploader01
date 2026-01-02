@@ -7,6 +7,10 @@ on:
         description: "ACR image tag to push/update (e.g. v2026.01.01)"
         required: false
         default: "latest"
+      flutter_api_url:
+        description: "Flutter app API Base URL (leave empty for default)"
+        required: false
+        default: ""
   push:
     branches:
       [
@@ -31,6 +35,8 @@ env:
   ACR_LOGIN_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
   IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag || 'latest' }}
+  # Flutter app configuration (priority: workflow input > vars > default)
+  FLUTTER_API_BASE_URL: ${{ github.event.inputs.flutter_api_url || vars.BACKEND_API_URL || 'https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io' }}
 
 jobs:
   build-and-push:
@@ -88,9 +94,17 @@ jobs:
 
       - name: Build and push image
         run: |
+          # Set build args for Flutter app
+          BUILD_ARGS=""
+          if [ "${{ matrix.name }}" = "storj-flutter" ]; then
+            BUILD_ARGS="--build-arg API_BASE_URL=${FLUTTER_API_BASE_URL}"
+            echo "Building Flutter app with API_BASE_URL: ${FLUTTER_API_BASE_URL}"
+          fi
+
           docker buildx build \
             --platform linux/amd64 \
             --tag "$ACR_LOGIN_SERVER/${{ matrix.name }}:${IMAGE_TAG}" \
+            $BUILD_ARGS \
             --push \
             "${{ matrix.context }}"
 
