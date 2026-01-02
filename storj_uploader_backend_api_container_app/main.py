@@ -668,24 +668,25 @@ async def save_file_to_target(file_path: Path, target_path: Path):
                             _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "processing", "uploading thumbnail to Blob")
                             await loop.run_in_executor(
                                 blob_executor,
-                            _sync_upload_to_blob,
-                            thumbnail_path,
-                            thumbnail_filename,
-                            upload_container
-                        )
-                        _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "success", f"uploaded to {upload_container}")
-                        if MIRROR_BLOB_TO_LOCAL:
-                            try:
-                                local_thumb_path = UPLOAD_TARGET_DIR / thumbnail_filename
-                                local_thumb_path.parent.mkdir(parents=True, exist_ok=True)
-                                shutil.move(str(thumbnail_path), str(local_thumb_path))
-                                _log_file_status(thumbnail_filename, "BACKEND:LOCAL_MIRROR", "success", "thumbnail mirrored to local upload_target")
-                            except Exception as thumb_mirror_error:
-                                _log_file_status(thumbnail_filename, "BACKEND:LOCAL_MIRROR", "error", f"mirror failed: {thumb_mirror_error}")
+                                _sync_upload_to_blob,
+                                thumbnail_path,
+                                thumbnail_filename,
+                                upload_container
+                            )
+                            _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "success", f"uploaded to {upload_container}")
+                            if MIRROR_BLOB_TO_LOCAL:
+                                try:
+                                    local_thumb_path = UPLOAD_TARGET_DIR / thumbnail_filename
+                                    local_thumb_path.parent.mkdir(parents=True, exist_ok=True)
+                                    shutil.move(str(thumbnail_path), str(local_thumb_path))
+                                    _log_file_status(thumbnail_filename, "BACKEND:LOCAL_MIRROR", "success", "thumbnail mirrored to local upload_target")
+                                except Exception as thumb_mirror_error:
+                                    _log_file_status(thumbnail_filename, "BACKEND:LOCAL_MIRROR", "error", f"mirror failed: {thumb_mirror_error}")
+                                    if thumbnail_path.exists():
+                                        thumbnail_path.unlink()
+                            else:
                                 if thumbnail_path.exists():
-                                    thumbnail_path.unlink()
-                        else:
-                            thumbnail_path.unlink()  # アップロード後削除
+                                    thumbnail_path.unlink()  # アップロード後削除
                         except Exception as thumb_upload_error:
                             _log_file_status(thumbnail_filename, "BACKEND:BLOB_UPLOAD", "error", str(thumb_upload_error))
                 else:
