@@ -150,7 +150,7 @@ class TriggerUploadResponse(BaseModel):
 class UploadStatusItem(BaseModel):
     """アップロード進捗ステータス"""
     name: str = Field(..., description="保存名（saved_as）")
-    status: Literal['queued', 'processing', 'uploaded', 'unknown'] = Field(..., description="ステータス")
+    status: Literal['queued', 'processing', 'uploaded', 'error', 'unknown'] = Field(..., description="ステータス")
 
 class UploadStatusResponse(BaseModel):
     """アップロード進捗レスポンス"""
