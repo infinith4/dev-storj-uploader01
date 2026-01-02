@@ -701,6 +701,7 @@ async def upload_images(
 
     async def process_single_image(file: UploadFile) -> dict:
         """単一画像ファイルを処理"""
+        _log_file_status(file.filename, "BACKEND:RECEIVE", "processing", f"size={file.size or 'unknown'}")
         try:
             # ファイルサイズチェック
             if file.size and file.size > MAX_FILE_SIZE:
@@ -741,6 +742,7 @@ async def upload_images(
             # 非同期でBlob Storageにアップロード
             await save_file_to_target(temp_path, target_path)
 
+            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"saved as {unique_filename}")
             return {
                 "filename": file.filename,
                 "saved_as": unique_filename,
@@ -749,6 +751,7 @@ async def upload_images(
             }
 
         except Exception as e:
+            _log_file_status(file.filename, "BACKEND:ERROR", "error", str(e))
             return {
                 "filename": file.filename,
                 "status": "error",
@@ -828,6 +831,7 @@ async def upload_files(
 
     async def process_single_file(file: UploadFile) -> dict:
         """単一ファイルを処理"""
+        _log_file_status(file.filename, "BACKEND:RECEIVE", "processing", f"size={file.size or 'unknown'}")
         try:
             # ファイルサイズチェック
             if file.size and file.size > MAX_FILE_SIZE:
@@ -865,6 +869,7 @@ async def upload_files(
             # 非同期でBlob Storageにアップロード（バックグラウンドではなく直接実行）
             await save_file_to_target(temp_path, target_path)
 
+            _log_file_status(file.filename, "BACKEND:COMPLETE", "success", f"saved as {unique_filename}")
             return {
                 "filename": file.filename,
                 "saved_as": unique_filename,
@@ -874,6 +879,7 @@ async def upload_files(
             }
 
         except Exception as e:
+            _log_file_status(file.filename, "BACKEND:ERROR", "error", str(e))
             return {
                 "filename": file.filename,
                 "status": "error",
