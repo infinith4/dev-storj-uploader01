@@ -1408,12 +1408,6 @@ async def get_storj_image(
                     if legacy_success and legacy_data:
                         success, image_data, error_msg = legacy_success, legacy_data, legacy_error
                     else:
-                        if background_tasks:
-                            background_tasks.add_task(
-                                _schedule_video_thumbnail_generation,
-                                image_path,
-                                bucket_name
-                            )
                         image_data = _generate_video_placeholder()
                         success = True
                         error_msg = "Placeholder (thumbnail not found)"
