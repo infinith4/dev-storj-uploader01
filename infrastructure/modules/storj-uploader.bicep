@@ -61,6 +61,12 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
   properties: {
     environmentId: environmentId
     configuration: {
+      ingress: {
+        external: false
+        targetPort: 8080
+        transport: 'http'
+        allowInsecure: true
+      }
       secrets: concat([
         {
           name: 'storage-key'
@@ -126,24 +132,12 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
               secretRef: 'rclone-config'
             }
             {
-              name: 'AZURE_STORAGE_ACCOUNT_NAME'
-              value: storageAccountName
+              name: 'FILE_SHARE_MOUNT'
+              value: '/mnt/temp'
             }
             {
-              name: 'AZURE_STORAGE_ACCOUNT_KEY'
-              secretRef: 'storage-key'
-            }
-            {
-              name: 'AZURE_STORAGE_UPLOAD_CONTAINER'
-              value: 'upload-target'
-            }
-            {
-              name: 'AZURE_STORAGE_UPLOADED_CONTAINER'
-              value: 'uploaded'
-            }
-            {
-              name: 'CLOUD_ENV'
-              value: 'azure'
+              name: 'PORT'
+              value: '8080'
             }
           ]
           volumeMounts: [
@@ -151,34 +145,30 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
               volumeName: 'rclone-config-volume'
               mountPath: '/root/.config/rclone'
             }
+            {
+              volumeName: 'temp'
+              mountPath: '/mnt/temp'
+            }
           ]
           command: [
             '/bin/sh'
             '-c'
           ]
           args: [
-            'echo "$RCLONE_CONFIG" > /root/.config/rclone/rclone.conf && chmod 600 /root/.config/rclone/rclone.conf && python3 storj_uploader.py'
+            'echo "$RCLONE_CONFIG" > /root/.config/rclone/rclone.conf && chmod 600 /root/.config/rclone/rclone.conf && python3 http_processor.py'
           ]
         }
       ]
       scale: {
         minReplicas: 0
-        maxReplicas: 5
+        maxReplicas: 3
         rules: [
           {
-            name: 'blob-scaling'
-            custom: {
-              type: 'azure-blob'
+            name: 'http-scaling'
+            http: {
               metadata: {
-                blobContainerName: 'upload-target'
-                blobCount: '5'
+                concurrentRequests: '1'
               }
-              auth: [
-                {
-                  secretRef: 'storage-connection-string'
-                  triggerParameter: 'connection'
-                }
-              ]
             }
           }
         ]
@@ -187,6 +177,11 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'rclone-config-volume'
           storageType: 'EmptyDir'
+        }
+        {
+          name: 'temp'
+          storageType: 'AzureFile'
+          storageName: 'temp'
         }
       ]
     }
