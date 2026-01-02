@@ -45,6 +45,9 @@ class StorjUploader:
         self.remote_name = os.getenv('STORJ_REMOTE_NAME', 'storj')
         self.hash_length = int(os.getenv('HASH_LENGTH', '10'))
         self.max_workers = int(os.getenv('MAX_WORKERS', '8'))
+        self.rclone_multi_thread_streams = int(os.getenv('RCLONE_MULTI_THREAD_STREAMS', '4'))
+        self.rclone_multi_thread_cutoff = os.getenv('RCLONE_MULTI_THREAD_CUTOFF', '32M').strip()
+        self.rclone_copy_flags = self._build_rclone_copy_flags()
         self.upload_target_dir = Path('upload_target')
         self.uploaded_dir = Path('uploaded')
         self.temp_dir = Path('temp_upload')
@@ -55,6 +58,7 @@ class StorjUploader:
         self.use_blob_storage = False
         self.upload_container_name = os.getenv('AZURE_STORAGE_UPLOAD_CONTAINER', 'upload-target')
         self.uploaded_container_name = os.getenv('AZURE_STORAGE_UPLOADED_CONTAINER', 'uploaded')
+        self.blob_download_concurrency = int(os.getenv('AZURE_BLOB_DOWNLOAD_CONCURRENCY', '4'))
 
         # Try to initialize Blob Storage
         if BLOB_STORAGE_AVAILABLE:
@@ -84,6 +88,16 @@ class StorjUploader:
             return True, result.stdout
         except subprocess.CalledProcessError as e:
             return False, e.stderr
+
+    def _build_rclone_copy_flags(self):
+        flags = []
+        if self.rclone_multi_thread_streams > 1:
+            flags.append(f"--multi-thread-streams {self.rclone_multi_thread_streams}")
+            if self.rclone_multi_thread_cutoff:
+                flags.append(f"--multi-thread-cutoff {self.rclone_multi_thread_cutoff}")
+        if not flags:
+            return ""
+        return " " + " ".join(flags)
 
     def check_bucket_exists(self):
         command = f"rclone lsd {self.remote_name}:"
@@ -353,7 +367,7 @@ class StorjUploader:
                 temp_file = thread_temp_dir / unique_filename
                 try:
                     shutil.copy2(file_path, temp_file)
-                    command = f"rclone copy '{temp_file}' {remote_path}"
+                    command = f"rclone copy '{temp_file}' {remote_path}{self.rclone_copy_flags}"
                     success, output = self.run_rclone_command(command)
                 finally:
                     # Ensure temporary file is always cleaned up
@@ -366,7 +380,7 @@ class StorjUploader:
                         # Directory not empty or other issue, ignore
                         pass
             else:
-                command = f"rclone copy '{file_path}' {remote_path}"
+                command = f"rclone copy '{file_path}' {remote_path}{self.rclone_copy_flags}"
                 success, output = self.run_rclone_command(command)
 
             if success:
@@ -394,7 +408,7 @@ class StorjUploader:
                                 f.write(thumbnail_data)
 
                             # Upload thumbnail
-                            thumb_command = f"rclone copy '{temp_thumb_file}' {thumbnail_remote_path}"
+                            thumb_command = f"rclone copy '{temp_thumb_file}' {thumbnail_remote_path}{self.rclone_copy_flags}"
                             thumb_success, thumb_output = self.run_rclone_command(thumb_command)
 
                             if thumb_success:
@@ -511,7 +525,8 @@ class StorjUploader:
             )
 
             with open(local_path, "wb") as download_file:
-                download_file.write(blob_client.download_blob().readall())
+                downloader = blob_client.download_blob(max_concurrency=self.blob_download_concurrency)
+                download_file.write(downloader.readall())
 
             return local_path
         except Exception as e:

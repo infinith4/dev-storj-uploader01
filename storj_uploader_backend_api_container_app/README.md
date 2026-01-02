@@ -182,6 +182,10 @@ docker-compose up --build
 | UPLOAD_TARGET_DIR | ../storj_container_app/upload_target | Storjアップロード対象ディレクトリ |
 | TEMP_DIR | ./temp | 一時ファイル保存ディレクトリ |
 | MAX_FILE_SIZE | 100000000 | 最大ファイルサイズ（バイト） |
+| UPLOAD_WORKERS | 8 | Blob Storage I/O用スレッド数 |
+| AZURE_BLOB_UPLOAD_CONCURRENCY | 4 | Blobアップロードの並列度 |
+| AZURE_BLOB_DOWNLOAD_CONCURRENCY | 4 | Blobダウンロードの並列度 |
+| AZURE_BLOB_UPLOAD_BLOCK_SIZE_MB | 4 | Blobアップロードのブロックサイズ(MB) |
 | API_HOST | 0.0.0.0 | APIサーバーホスト |
 | API_PORT | 8000 | APIサーバーポート |
 

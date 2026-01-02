@@ -317,7 +317,8 @@ class StorjClient:
                     thumb_index = filename.lower().find('_thumb')
                     if thumb_index > 0:
                         video_stem = filename[:thumb_index]
-                        thumbnails[video_stem.lower()] = path
+                        current = thumbnails.get(video_stem.lower())
+                        thumbnails[video_stem.lower()] = self._prefer_thumbnail_path(current, path)
 
                 if path.lower().endswith(image_extensions) or path.lower().endswith(video_extensions):
                     all_files.append((path, size, mod_time))
@@ -446,7 +447,8 @@ class StorjClient:
                     thumb_index = filename.lower().find('_thumb')
                     if thumb_index > 0:
                         video_stem = filename[:thumb_index]
-                        thumbnails[video_stem.lower()] = path
+                        current = thumbnails.get(video_stem.lower())
+                        thumbnails[video_stem.lower()] = self._prefer_thumbnail_path(current, path)
 
                 # Collect all media files (images and videos)
                 if path.lower().endswith(image_extensions) or path.lower().endswith(video_extensions):
@@ -519,6 +521,21 @@ class StorjClient:
             '.m4v', '.3gp', '.flv', '.wmv'
         )
         return path.lower().endswith(video_extensions)
+
+    def _is_hashed_thumbnail(self, path: str) -> bool:
+        filename = Path(path).name.lower()
+        return "_thumb_" in filename and not filename.endswith("_thumb.jpg")
+
+    def _prefer_thumbnail_path(self, current: Optional[str], candidate: str) -> str:
+        if not current:
+            return candidate
+        current_hashed = self._is_hashed_thumbnail(current)
+        candidate_hashed = self._is_hashed_thumbnail(candidate)
+        if candidate_hashed and not current_hashed:
+            return candidate
+        if current_hashed and not candidate_hashed:
+            return current
+        return min(current, candidate)
 
     def _thumbnail_key(self, path: str) -> str:
         return str(Path(path).with_suffix('')).lower()
@@ -1110,8 +1127,11 @@ class StorjClient:
                     print(f"[{datetime.now()}] No thumbnail found for prefix: {thumbnail_prefix}")
                     return False, b"", "Thumbnail not found"
 
-                # Get the first matching thumbnail
-                thumbnail_path = matching_files[0]
+                thumbnail_path = None
+                for candidate in matching_files:
+                    thumbnail_path = self._prefer_thumbnail_path(thumbnail_path, candidate)
+                if not thumbnail_path:
+                    return False, b"", "Thumbnail not found"
                 print(f"[{datetime.now()}] Found thumbnail: {thumbnail_path}")
 
                 # Fetch the thumbnail

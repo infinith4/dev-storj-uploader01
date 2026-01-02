@@ -16,6 +16,9 @@ class BlobStorageHelper:
         self.account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
         self.upload_container = os.getenv("AZURE_STORAGE_UPLOAD_CONTAINER", "upload-target")
         self.uploaded_container = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+        self.upload_max_concurrency = self._get_int_env("AZURE_BLOB_UPLOAD_CONCURRENCY", 4)
+        self.download_max_concurrency = self._get_int_env("AZURE_BLOB_DOWNLOAD_CONCURRENCY", 4)
+        self.upload_block_size_mb = self._get_int_env("AZURE_BLOB_UPLOAD_BLOCK_SIZE_MB", 4)
 
         if not self.account_name or not self.account_key:
             raise ValueError(
@@ -28,6 +31,14 @@ class BlobStorageHelper:
             account_url=f"https://{self.account_name}.blob.core.windows.net",
             credential=self.account_key
         )
+
+    @staticmethod
+    def _get_int_env(name: str, default: int) -> int:
+        try:
+            value = int(os.getenv(name, default))
+        except ValueError:
+            return default
+        return value if value > 0 else default
 
     def upload_file(self, file_path: str, blob_name: Optional[str] = None, container_name: Optional[str] = None) -> str:
         """
@@ -53,7 +64,13 @@ class BlobStorageHelper:
         )
 
         with open(file_path, "rb") as data:
-            blob_client.upload_blob(data, overwrite=True)
+            upload_kwargs = {
+                "overwrite": True,
+                "max_concurrency": self.upload_max_concurrency
+            }
+            if self.upload_block_size_mb:
+                upload_kwargs["max_block_size"] = self.upload_block_size_mb * 1024 * 1024
+            blob_client.upload_blob(data, **upload_kwargs)
 
         return blob_name
 
@@ -77,7 +94,8 @@ class BlobStorageHelper:
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
         with open(local_path, "wb") as download_file:
-            download_file.write(blob_client.download_blob().readall())
+            downloader = blob_client.download_blob(max_concurrency=self.download_max_concurrency)
+            download_file.write(downloader.readall())
 
     def list_blobs(self, container_name: Optional[str] = None, prefix: Optional[str] = None) -> List[str]:
         """
@@ -190,7 +208,11 @@ class BlobStorageHelper:
             container=container_name,
             blob=blob_name
         )
-        return blob_client.download_blob(offset=offset, length=length).readall()
+        return blob_client.download_blob(
+            offset=offset,
+            length=length,
+            max_concurrency=self.download_max_concurrency
+        ).readall()
 
     def stream_blob(
         self,
@@ -210,7 +232,11 @@ class BlobStorageHelper:
             container=container_name,
             blob=blob_name
         )
-        downloader = blob_client.download_blob(offset=offset, length=length)
+        downloader = blob_client.download_blob(
+            offset=offset,
+            length=length,
+            max_concurrency=self.download_max_concurrency
+        )
         return downloader.chunks(chunk_size=chunk_size)
 
     def move_blob(self, blob_name: str, source_container: Optional[str] = None, dest_container: Optional[str] = None):
