@@ -18,6 +18,8 @@ from datetime import datetime
 import hashlib
 import aiofiles
 import threading
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 import io
 from dotenv import load_dotenv
@@ -152,7 +154,24 @@ def _generate_video_thumbnail(
     cache_filename = video_path.replace("/", "_").replace("\\", "_")
     cache_path = cache_dir / cache_filename
 
+    path_obj = Path(video_path)
+    dir_name = path_obj.parent.name
+    file_stem = path_obj.stem
+    if dir_name:
+        thumb_remote_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
+    else:
+        thumb_remote_path = f"thumbnails/{file_stem}_thumb.jpg"
+
     if cache_path.exists() and cache_path.stat().st_size > 0:
+        upload_success, upload_error = storj_client.upload_storj_file(
+            local_path=cache_path,
+            remote_path=thumb_remote_path,
+            bucket_name=bucket
+        )
+        if upload_success:
+            print(f"✓ Thumbnail uploaded to Storj (cache): {thumb_remote_path}")
+        else:
+            print(f"⚠ Failed to upload thumbnail to Storj (cache): {upload_error}")
         return True, cache_path.read_bytes(), "Success (cached)"
 
     temp_dir = Path(os.getenv("TEMP_DIR", "./temp"))
@@ -199,13 +218,6 @@ def _generate_video_thumbnail(
             cache_file.write(thumb_data)
         temp_cache_path.replace(cache_path)
 
-        path_obj = Path(video_path)
-        dir_name = path_obj.parent.name
-        file_stem = path_obj.stem
-        if dir_name:
-            thumb_remote_path = f"thumbnails/{dir_name}/{file_stem}_thumb.jpg"
-        else:
-            thumb_remote_path = f"thumbnails/{file_stem}_thumb.jpg"
         upload_success, upload_error = storj_client.upload_storj_file(
             local_path=temp_thumb,
             remote_path=thumb_remote_path,
