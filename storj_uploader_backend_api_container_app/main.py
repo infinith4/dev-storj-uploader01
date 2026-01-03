@@ -6,7 +6,7 @@ FastAPI + OpenAPI v3対応のファイルアップロードAPI
 HEICやJPEGなどの画像ファイル、動画ファイル、その他すべてのファイル形式に対応
 """
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Body
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
@@ -366,6 +366,9 @@ if storj_env_path.exists():
 # OpenAPI v3メタデータ設定
 app = FastAPI(
     title="Storj Uploader Backend API",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     description="""
     ## Storj Uploader Backend API
 
@@ -451,6 +454,23 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Length", "Content-Range", "Accept-Ranges", "Content-Type"],
 )
+
+@app.get("/", include_in_schema=False)
+async def root(request: Request):
+    """
+    Redirect the landing page to the interactive OpenAPI (Swagger UI).
+    """
+    docs_path = app.swagger_ui_url or "/docs"
+    base_url = str(request.base_url).rstrip("/")
+    target = docs_path if docs_path.startswith("http") else f"{base_url}{docs_path}"
+    return RedirectResponse(url=target)
+
+@app.get("/openapi", include_in_schema=False)
+async def openapi_spec():
+    """
+    Convenience endpoint to view the OpenAPI v3 schema.
+    """
+    return JSONResponse(app.openapi())
 
 # 設定
 UPLOAD_TARGET_DIR = storj_client.get_upload_target_dir()
