@@ -103,6 +103,8 @@ var storjAppName = '${baseName}-storj-${uniqueSuffix}'
 var keyVaultName = '${baseName}-kv-${uniqueSuffix}'
 var cdnProfileName = '${baseName}-cdn-${uniqueSuffix}'
 var cdnEndpointName = 'cdn-${uniqueSuffix}'
+var cdnDefaultDomain = '${cdnEndpointName}.z01.azurefd.net'
+var mediaCdnBaseUrl = deployCdn ? 'https://${cdnDefaultDomain}' : ''
 
 // Key Vault
 module keyVault 'modules/key-vault.bicep' = {
@@ -220,6 +222,7 @@ module backendApi 'modules/backend-api.bicep' = {
     gallerySource: gallerySource
     maxFileSize: maxFileSize
     apiBaseUrl: 'https://${backendAppName}.${environment.outputs.defaultDomain}'
+    mediaCdnBaseUrl: mediaCdnBaseUrl
   }
   dependsOn: [
     storageConfigTemp
@@ -417,6 +420,7 @@ resource contributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
 output backendApiUrl string = 'https://${backendApi.outputs.fqdn}'
 output frontendUrl string = 'https://${frontend.outputs.fqdn}'
 output flutterUrl string = 'https://${flutterWeb.outputs.fqdn}'
+output cdnEndpointHost string = deployCdn ? cdnDefaultDomain : ''
 output storageAccountName string = storage.outputs.storageAccountName
 output environmentName string = environment.outputs.environmentName
 output resourceGroupName string = resourceGroup().name

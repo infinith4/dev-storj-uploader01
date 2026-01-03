@@ -337,7 +337,8 @@ class StorjClient:
                 if path.lower().endswith(image_extensions) or path.lower().endswith(video_extensions):
                     all_files.append((path, size, mod_time))
 
-            api_base_url = (base_url or os.getenv("API_BASE_URL") or "http://localhost:8010").rstrip("/")
+            cdn_base_url = os.getenv("MEDIA_CDN_BASE_URL") or os.getenv("CDN_BASE_URL")
+            api_base_url = (cdn_base_url or base_url or os.getenv("API_BASE_URL") or "http://localhost:8010").rstrip("/")
 
             for path, size, mod_time in all_files:
                 filename = path.split('/')[-1]
