@@ -152,7 +152,7 @@ class SystemStatusCard extends StatelessWidget {
         _buildDetailRow(
           context,
           'Total Uploaded',
-          '${status!.totalUploaded} files',
+          '${status!.storjFileCount} files',
           Icons.cloud_upload,
           const Color(UIConstants.primaryColorValue),
         ),
