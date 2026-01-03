@@ -26,10 +26,36 @@ Flutter web application that provides a user-friendly interface for uploading fi
 # Install dependencies
 flutter pub get
 
-# Run in debug mode
+# Run on Web
 flutter run -d web-server --web-port 8080
 
+# Run on Android (emulator or connected device)
+flutter run -d android
+
+# Run on Chrome browser
+flutter run -d chrome
 ```
+
+### Android APK Build
+
+```bash
+# Debug APK
+flutter build apk --debug
+
+# Release APK (requires signing config)
+flutter build apk --release
+
+# APK output location:
+# build/app/outputs/flutter-apk/app-debug.apk
+# build/app/outputs/flutter-apk/app-release.apk
+
+# Install on connected device
+flutter install
+```
+
+**Note**: For Android builds, you need to have Android SDK installed. The app requires:
+- minSdkVersion: 24 (Android 7.0)
+- targetSdkVersion: 34 (Android 14)
 
 ### Production (Docker)
 
