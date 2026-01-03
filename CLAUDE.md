@@ -222,10 +222,84 @@ docker rmi storj_container_app-storj_container_app
 docker-compose up
 ```
 
-### Android App Development
+### Flutter App Development (Web + Android)
 
-**Windows 環境でのビルド:**
+**開発サーバーの起動:**
+```bash
+cd flutter_app_storj_uploader
 
+# Install dependencies
+flutter pub get
+
+# Run on Web
+flutter run -d web-server --web-port 8080
+# または
+flutter run -d chrome
+
+# Run on Android (emulator or device)
+flutter run -d android
+```
+
+**Android APKビルド（簡単な方法）:**
+```bash
+cd flutter_app_storj_uploader
+
+# Linux/Mac
+./build_android.sh                 # Debug APK
+./build_android.sh --release       # Release APK
+./build_android.sh --release --split-per-abi  # ABI別にビルド
+
+# Windows
+build_android.bat                  # Debug APK
+build_android.bat --release        # Release APK
+build_android.bat --release --split-per-abi
+```
+
+**Android APKビルド（手動）:**
+```bash
+cd flutter_app_storj_uploader
+
+# Debug APK
+flutter build apk --debug
+
+# Release APK
+flutter build apk --release
+
+# Release APK with ABI splits (推奨)
+flutter build apk --release --split-per-abi
+
+# Install on connected device
+flutter install
+
+# APK location:
+# build/app/outputs/flutter-apk/app-debug.apk
+# build/app/outputs/flutter-apk/app-release.apk
+# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk (ABI splits)
+```
+
+**Android Studioでの開発:**
+```bash
+# Android Studioで flutter_app_storj_uploader/android/ を開く
+# または、プロジェクトルートで:
+flutter pub get
+# その後 Android Studio から Run/Debug
+```
+
+**GitHub Actionsでの自動ビルド:**
+- ワークフロー: `.github/workflows/flutter-android-build.yml`
+- トリガー: main/develop/claude/** ブランチへのプッシュ、PRの作成
+- リリース: `flutter-v*` タグをプッシュすると自動的にGitHub Releaseが作成される
+
+```bash
+# Release作成例
+git tag flutter-v1.0.0
+git push origin flutter-v1.0.0
+# GitHub Actionsが自動的にAPKをビルドしてReleaseに添付
+```
+
+### Android App Development (Kotlin Native - Legacy)
+
+**Windows環境でのビルド:**
 ```cmd
 cd android_storj_uploader
 
@@ -459,8 +533,17 @@ All endpoints have:
 
 ## GitHub Actions CI/CD
 
-### Android App
+### Flutter Android App
+- **Workflow**: `.github/workflows/flutter-android-build.yml`
+- **Triggers**: Push/PR to main/develop/claude/** branches, tag push, manual dispatch
+- **Tasks**:
+  - Build debug/release APK with ABI splits
+  - Run `flutter analyze` and `flutter test`
+  - Code quality checks (`flutter format`)
+- **Release**: Tag push (e.g., `flutter-v1.0.0`) creates GitHub Release with APKs
+- **Artifacts**: Debug APK, Release APK, Split APKs (arm64-v8a, armeabi-v7a, x86_64)
 
+### Android App (Kotlin Native - Legacy)
 - **Workflow**: `.github/workflows/android-build.yml`
 - **Triggers**: Push/PR to any branch, tag push
 - **Tasks**: Build debug APK, run tests, lint check
@@ -470,8 +553,12 @@ All endpoints have:
 
 ## Documentation Files
 
-- `android_storj_uploader/README.md` - Android app setup (Windows 専用手順)
+- `flutter_app_storj_uploader/README.md` - Flutter app setup and development (Web + Android)
+- `flutter_app_storj_uploader/build_android.sh` - Android build script for Linux/Mac
+- `flutter_app_storj_uploader/build_android.bat` - Android build script for Windows
+- `android_storj_uploader/README.md` - Android app setup (Windows専用手順)
 - `android_storj_uploader/SCREEN_DESIGN.md` - 画面設計書・画面遷移図
 - `android_storj_uploader/RELEASE.md` - リリースビルドとデプロイ
-- `.devcontainer/README.md` - Dev Container setup guide
-- `.github/workflows/android-build.yml` - CI/CD configuration
+- `.devcontainer/README.md` - Dev Container setup guide (Flutter/Android SDK included)
+- `.github/workflows/flutter-android-build.yml` - Flutter Android CI/CD configuration
+- `.github/workflows/android-build.yml` - Kotlin Android CI/CD configuration
