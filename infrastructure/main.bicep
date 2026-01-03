@@ -87,6 +87,30 @@ param hashLength int = 10
 @description('Max workers for parallel upload')
 param maxWorkers int = 8
 
+@description('Backend container vCPU (e.g., 0.5, 1.0)')
+param backendCpu string = '0.5'
+
+@description('Backend container memory (e.g., 1.0Gi)')
+param backendMemory string = '1.0Gi'
+
+@description('Frontend container vCPU (e.g., 0.5, 1.0)')
+param frontendCpu string = '0.5'
+
+@description('Frontend container memory (e.g., 1.0Gi)')
+param frontendMemory string = '1.0Gi'
+
+@description('Flutter container vCPU (e.g., 0.5, 1.0)')
+param flutterCpu string = '0.5'
+
+@description('Flutter container memory (e.g., 1.0Gi)')
+param flutterMemory string = '1.0Gi'
+
+@description('Storj uploader container vCPU (e.g., 0.5, 1.0)')
+param storjCpu string = '0.5'
+
+@description('Storj uploader container memory (e.g., 1.0Gi)')
+param storjMemory string = '1.0Gi'
+
 @description('Deploy Azure CDN (Standard_Microsoft) to cache public assets')
 param deployCdn bool = true
 
@@ -221,6 +245,8 @@ module backendApi 'modules/backend-api.bicep' = {
     storjRemoteName: storjRemoteName
     gallerySource: gallerySource
     maxFileSize: maxFileSize
+    cpu: backendCpu
+    memory: backendMemory
     apiBaseUrl: 'https://${backendAppName}.${environment.outputs.defaultDomain}'
     mediaCdnBaseUrl: mediaCdnBaseUrl
   }
@@ -263,6 +289,8 @@ module storjUploader 'modules/storj-uploader.bicep' = {
     storjRemoteName: storjRemoteName
     hashLength: hashLength
     maxWorkers: maxWorkers
+    cpu: storjCpu
+    memory: storjMemory
     keyVaultUri: keyVault.outputs.keyVaultUri
     useKeyVault: true  // Key Vaultからrclone.confを読み込む
     rcloneConfig: rcloneConfig
@@ -374,6 +402,8 @@ module frontend 'modules/frontend.bicep' = {
     containerRegistryUsername: resolvedRegistryUsername
     containerRegistryPassword: resolvedRegistryPassword
     backendApiUrl: 'https://${backendApi.outputs.fqdn}'
+    cpu: frontendCpu
+    memory: frontendMemory
     enableAadAuth: enableAadAuth
     aadTenantId: aadTenantId
     aadClientId: aadClientId
@@ -395,6 +425,8 @@ module flutterWeb 'modules/flutter-web.bicep' = {
     containerRegistryServer: resolvedRegistryServer
     containerRegistryUsername: resolvedRegistryUsername
     containerRegistryPassword: resolvedRegistryPassword
+    cpu: flutterCpu
+    memory: flutterMemory
     enableAadAuth: enableAadAuth
     aadTenantId: aadTenantId
     aadClientId: aadClientId

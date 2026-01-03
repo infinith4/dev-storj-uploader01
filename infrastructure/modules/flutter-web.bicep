@@ -33,6 +33,12 @@ param containerRegistryPassword string = ''
 @description('Enable Azure AD EasyAuth for the Flutter web app')
 param enableAadAuth bool = false
 
+@description('vCPU requested for the flutter container (e.g., 0.5, 1.0)')
+param cpu string = '0.5'
+
+@description('Memory requested for the flutter container (e.g., 1.0Gi)')
+param memory string = '1.0Gi'
+
 @description('Azure AD tenant ID')
 param aadTenantId string = ''
 
@@ -49,17 +55,23 @@ param aadOpenIdIssuer string = ''
 @description('Allowed audiences for AAD tokens (defaults to client ID)')
 param aadAllowedAudiences array = []
 
-var resolvedAadOpenIdIssuer = empty(aadOpenIdIssuer) ? 'https://login.microsoftonline.com/${aadTenantId}/v2.0' : aadOpenIdIssuer
-var resolvedAadAllowedAudiences = empty(aadAllowedAudiences) ? [
-  aadClientId
-] : aadAllowedAudiences
+var resolvedAadOpenIdIssuer = empty(aadOpenIdIssuer)
+  ? 'https://login.microsoftonline.com/${aadTenantId}/v2.0'
+  : aadOpenIdIssuer
+var resolvedAadAllowedAudiences = empty(aadAllowedAudiences)
+  ? [
+      aadClientId
+    ]
+  : aadAllowedAudiences
 
 resource flutterWeb 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
-  identity: enableManagedIdentity ? {
-    type: 'SystemAssigned'
-  } : null
+  identity: enableManagedIdentity
+    ? {
+        type: 'SystemAssigned'
+      }
+    : null
   properties: {
     environmentId: environmentId
     configuration: {
@@ -69,26 +81,32 @@ resource flutterWeb 'Microsoft.App/containerApps@2023-05-01' = {
         transport: 'http'
         allowInsecure: false
       }
-      registries: empty(containerRegistryServer) ? [] : [
-        {
-          server: containerRegistryServer
-          username: containerRegistryUsername
-          passwordSecretRef: 'registry-password'
-        }
-      ]
+      registries: empty(containerRegistryServer)
+        ? []
+        : [
+            {
+              server: containerRegistryServer
+              username: containerRegistryUsername
+              passwordSecretRef: 'registry-password'
+            }
+          ]
       secrets: concat(
-        empty(containerRegistryPassword) ? [] : [
-          {
-            name: 'registry-password'
-            value: containerRegistryPassword
-          }
-        ],
-        enableAadAuth ? [
-          {
-            name: 'aad-client-secret'
-            value: aadClientSecret
-          }
-        ] : []
+        empty(containerRegistryPassword)
+          ? []
+          : [
+              {
+                name: 'registry-password'
+                value: containerRegistryPassword
+              }
+            ],
+        enableAadAuth
+          ? [
+              {
+                name: 'aad-client-secret'
+                value: aadClientSecret
+              }
+            ]
+          : []
       )
     }
     template: {
@@ -97,8 +115,8 @@ resource flutterWeb 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'flutter-web'
           image: containerImage
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json(cpu)
+            memory: memory
           }
         }
       ]
