@@ -35,21 +35,27 @@ class UploadResponse {
 class FileUploadResult {
   final String filename;
   final String status;
-  final String? error;
+  final String? message;  // Error or success message from backend
+  final String? savedAs;  // The filename saved on server
   final FileInfo? fileInfo;
 
   FileUploadResult({
     required this.filename,
     required this.status,
-    this.error,
+    this.message,
+    this.savedAs,
     this.fileInfo,
   });
+
+  bool get isSuccess => status == 'success';
+  bool get isError => status == 'error';
 
   factory FileUploadResult.fromJson(Map<String, dynamic> json) {
     return FileUploadResult(
       filename: json['filename'] ?? '',
       status: json['status'] ?? '',
-      error: json['error'],
+      message: json['message'],  // Backend sends error messages in 'message' field
+      savedAs: json['saved_as'],
       fileInfo: json['file_info'] != null
           ? FileInfo.fromJson(json['file_info'])
           : null,
