@@ -55,6 +55,9 @@ param maxFileSize int = 100000000
 @description('API Base URL for generating image URLs')
 param apiBaseUrl string
 
+@description('Optional CDN base URL for serving media')
+param mediaCdnBaseUrl string = ''
+
 resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
@@ -164,6 +167,14 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'API_BASE_URL'
               value: apiBaseUrl
+            }
+            {
+              name: 'MEDIA_CDN_BASE_URL'
+              value: mediaCdnBaseUrl
+            }
+            {
+              name: 'CDN_BASE_URL'
+              value: mediaCdnBaseUrl
             }
             {
               name: 'STORJ_CONTAINER_URL'
