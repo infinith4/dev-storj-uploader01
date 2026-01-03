@@ -25,6 +25,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late TabController _tabController;
   final List<LocalFile> _uploadQueue = [];
   bool _isConnected = false;
+  bool _forceTriggerUpload = false;
   StatusResponse? _systemStatus;
 
   @override
@@ -109,12 +110,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
 
     try {
-      final response = await ApiService().triggerUploadAsync();
+      final response =
+          await ApiService().triggerUploadAsync(force: _forceTriggerUpload);
       _showSnackBar(response.message);
       await _loadSystemStatus();
     } catch (e) {
       _showSnackBar('Failed to trigger upload: $e', isError: true);
     }
+  }
+
+  void _toggleForceTrigger() {
+    setState(() {
+      _forceTriggerUpload = !_forceTriggerUpload;
+    });
+    _showSnackBar(
+      _forceTriggerUpload
+          ? 'Force mode enabled (force=true)'
+          : 'Force mode disabled',
+    );
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -143,9 +156,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             tooltip: 'Refresh Status',
           ),
           IconButton(
+            icon: Icon(
+              Icons.flash_on,
+              color: _forceTriggerUpload
+                  ? Theme.of(context).colorScheme.secondary
+                  : null,
+            ),
+            onPressed: _toggleForceTrigger,
+            tooltip: _forceTriggerUpload
+                ? 'Force trigger ON (force=true)'
+                : 'Force trigger OFF (tap to enable)',
+          ),
+          IconButton(
             icon: const Icon(Icons.cloud_upload),
             onPressed: _triggerStorjUpload,
-            tooltip: 'Trigger Storj Upload',
+            tooltip: _forceTriggerUpload
+                ? 'Trigger Storj Upload (force=true)'
+                : 'Trigger Storj Upload',
           ),
           IconButton(
             icon: const Icon(Icons.settings),

@@ -247,9 +247,14 @@ class ApiService {
   }
 
   // Trigger Manual Storj Upload
-  Future<TriggerUploadResponse> triggerUpload() async {
+  Future<TriggerUploadResponse> triggerUpload({bool force = false}) async {
     try {
-      final response = await _client().post('/trigger-upload');
+      final response = await _client().post(
+        '/trigger-upload',
+        queryParameters: {
+          'force': force,
+        },
+      );
       return TriggerUploadResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -257,9 +262,14 @@ class ApiService {
   }
 
   // Trigger Async Storj Upload
-  Future<TriggerUploadResponse> triggerUploadAsync() async {
+  Future<TriggerUploadResponse> triggerUploadAsync({bool force = false}) async {
     try {
-      final response = await _client().post('/trigger-upload-async');
+      final response = await _client().post(
+        '/trigger-upload-async',
+        queryParameters: {
+          'force': force,
+        },
+      );
       return TriggerUploadResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
