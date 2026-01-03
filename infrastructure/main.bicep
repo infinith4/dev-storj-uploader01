@@ -87,6 +87,9 @@ param hashLength int = 10
 @description('Max workers for parallel upload')
 param maxWorkers int = 8
 
+@description('Deploy Azure CDN (Standard_Microsoft) to cache public assets')
+param deployCdn bool = true
+
 // Unique names
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var logAnalyticsName = '${baseName}-logs-${uniqueSuffix}'
@@ -98,6 +101,8 @@ var frontendAppName = '${baseName}-frontend-${uniqueSuffix}'
 var flutterAppName = '${baseName}-flutter-${uniqueSuffix}'
 var storjAppName = '${baseName}-storj-${uniqueSuffix}'
 var keyVaultName = '${baseName}-kv-${uniqueSuffix}'
+var cdnProfileName = '${baseName}-cdn-${uniqueSuffix}'
+var cdnEndpointName = 'cdn-${uniqueSuffix}'
 
 // Key Vault
 module keyVault 'modules/key-vault.bicep' = {
@@ -261,6 +266,80 @@ module storjUploader 'modules/storj-uploader.bicep' = {
   }
   dependsOn: [
     storage
+  ]
+}
+
+// Azure Front Door (Standard) profile + endpoint for CDN caching
+resource cdnProfile 'Microsoft.Cdn/profiles@2024-02-01' = if (deployCdn) {
+  name: cdnProfileName
+  location: 'global'
+  sku: {
+    name: 'Standard_AzureFrontDoor'
+  }
+}
+
+resource cdnEndpoint 'Microsoft.Cdn/profiles/afdEndpoints@2024-02-01' = if (deployCdn) {
+  parent: cdnProfile
+  name: cdnEndpointName
+  location: 'global'
+  properties: {
+    enabledState: 'Enabled'
+  }
+}
+
+resource cdnOriginGroup 'Microsoft.Cdn/profiles/originGroups@2024-02-01' = if (deployCdn) {
+  parent: cdnProfile
+  name: 'backend-origins'
+  properties: {
+    sessionAffinityState: 'Disabled'
+    healthProbeSettings: {
+      probePath: '/'
+      probeProtocol: 'Https'
+      probeRequestType: 'GET'
+      probeIntervalInSeconds: 240
+    }
+    loadBalancingSettings: {
+      sampleSize: 4
+      successfulSamplesRequired: 3
+      additionalLatencyInMilliseconds: 0
+    }
+  }
+}
+
+resource cdnOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = if (deployCdn) {
+  parent: cdnOriginGroup
+  name: 'backend-origin'
+  properties: {
+    hostName: '${backendAppName}.${environment.outputs.defaultDomain}'
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: '${backendAppName}.${environment.outputs.defaultDomain}'
+    priority: 1
+    weight: 1000
+    enabledState: 'Enabled'
+  }
+}
+
+resource cdnRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = if (deployCdn) {
+  parent: cdnEndpoint
+  name: 'cache-images'
+  properties: {
+    originGroup: {
+      id: cdnOriginGroup.id
+    }
+    supportedProtocols: [
+      'Https'
+    ]
+    httpsRedirect: 'Enabled'
+    linkToDefaultDomain: 'Enabled'
+    patternsToMatch: [
+      '/storj/images/*'
+      '/assets/*'
+    ]
+    forwardingProtocol: 'HttpsOnly'
+  }
+  dependsOn: [
+    cdnOrigin
   ]
 }
 
