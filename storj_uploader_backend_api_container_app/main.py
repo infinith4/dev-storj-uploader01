@@ -566,8 +566,8 @@ def _trigger_storj_processor():
         return False, "STORJ_CONTAINER_URL not set"
     try:
         req = urllib_request.Request(url, method="POST")
-        # KEDA HTTP scaler can take a few seconds to spin up a replica; allow a longer timeout
-        with urllib_request.urlopen(req, timeout=20) as resp:
+        # KEDA HTTP scaler can take 30-60 seconds to spin up a replica from 0; allow 90s timeout
+        with urllib_request.urlopen(req, timeout=90) as resp:
             _ = resp.read()
         print(f"Triggered Storj processor via HTTP: {url}")
         return True, "triggered"
@@ -1519,9 +1519,19 @@ async def get_storj_image(
                     if legacy_success and legacy_data:
                         success, image_data, error_msg = legacy_success, legacy_data, legacy_error
                     else:
-                        image_data = _generate_video_placeholder()
-                        success = True
-                        error_msg = "Placeholder (thumbnail not found)"
+                        # Generate thumbnail on-demand (synchronously for first request)
+                        print(f"⚠ Thumbnail not found in Storj, generating on-demand for: {image_path}")
+                        gen_success, gen_data, gen_error = _generate_video_thumbnail(
+                            video_path=image_path,
+                            bucket=bucket_name
+                        )
+                        if gen_success and gen_data:
+                            success, image_data, error_msg = gen_success, gen_data, gen_error
+                        else:
+                            print(f"✗ Failed to generate thumbnail: {gen_error}")
+                            image_data = _generate_video_placeholder()
+                            success = True
+                            error_msg = "Placeholder (thumbnail generation failed)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,
