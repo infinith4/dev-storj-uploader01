@@ -460,7 +460,7 @@ async def root(request: Request):
     """
     Redirect the landing page to the interactive OpenAPI (Swagger UI).
     """
-    docs_path = app.swagger_ui_url or "/docs"
+    docs_path = getattr(app, "docs_url", "/docs") or "/docs"
     base_url = str(request.base_url).rstrip("/")
     target = docs_path if docs_path.startswith("http") else f"{base_url}{docs_path}"
     return RedirectResponse(url=target)
