@@ -61,6 +61,23 @@ You can open and develop the Android part of this Flutter project directly in An
 
 ### Android APK Build (Command Line)
 
+**Quick Build (Using Build Scripts):**
+
+```bash
+# Linux/Mac
+./build_android.sh                 # Build debug APK
+./build_android.sh --release       # Build release APK
+./build_android.sh --release --split-per-abi  # Build with ABI splits
+./build_android.sh --help          # Show all options
+
+# Windows
+build_android.bat                  # Build debug APK
+build_android.bat --release        # Build release APK
+build_android.bat --release --split-per-abi
+```
+
+**Manual Build:**
+
 ```bash
 # Debug APK
 flutter build apk --debug
@@ -68,9 +85,15 @@ flutter build apk --debug
 # Release APK (requires signing config)
 flutter build apk --release
 
+# Release APK with ABI splits (recommended for production)
+flutter build apk --release --split-per-abi
+
 # APK output location:
 # build/app/outputs/flutter-apk/app-debug.apk
 # build/app/outputs/flutter-apk/app-release.apk
+# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+# build/app/outputs/flutter-apk/app-x86_64-release.apk
 
 # Install on connected device
 flutter install
@@ -328,3 +351,71 @@ RUN flutter build web --release
 ```
 
 Or set the API URL at runtime using environment variables in the Container App configuration.
+
+## CI/CD with GitHub Actions
+
+This repository includes automated build workflows for Flutter Android:
+
+### Workflow: Flutter Android CI/CD
+
+**File**: `.github/workflows/flutter-android-build.yml`
+
+**Triggers**:
+- Push to `main`, `master`, `develop`, or `claude/**` branches
+- Pull requests to `main`, `master`, or `develop` branches
+- Manual workflow dispatch
+
+**Jobs**:
+
+1. **build-android**: Builds Flutter Android APKs
+   - Runs on every push/PR
+   - Outputs:
+     - Debug APK: `flutter-app-debug`
+     - Release APK: `flutter-app-release`
+     - Split APKs: `flutter-app-release-split` (arm64-v8a, armeabi-v7a, x86_64)
+   - Also runs `flutter analyze` and `flutter test`
+
+2. **release**: Creates GitHub Release
+   - Runs only on tag push matching `flutter-v*` (e.g., `flutter-v1.0.0`)
+   - Uploads split APKs to GitHub Release
+   - Generates release notes with installation instructions
+
+3. **quality**: Code quality checks
+   - Runs `flutter analyze` and `flutter format`
+   - Uploads analysis reports as artifacts
+
+### Creating a Release
+
+To create a new Flutter Android release:
+
+```bash
+# Tag the current commit
+git tag flutter-v1.0.0
+git push origin flutter-v1.0.0
+
+# GitHub Actions will automatically:
+# 1. Build release APKs with ABI splits
+# 2. Create a GitHub Release
+# 3. Upload APKs to the release
+```
+
+### Downloading Build Artifacts
+
+After a successful build, you can download the APK artifacts from:
+- GitHub Actions → Select workflow run → Artifacts section
+- Or from the GitHub Release page (for tagged releases)
+
+### Local Testing Before Release
+
+Before creating a release tag, test the build locally:
+
+```bash
+# Use the build script
+./build_android.sh --release --split-per-abi
+
+# Or use Flutter directly
+flutter build apk --release --split-per-abi
+
+# Test the APK on a device
+adb install build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```
