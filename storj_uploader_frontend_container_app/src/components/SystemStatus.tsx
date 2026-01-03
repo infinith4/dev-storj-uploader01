@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { RefreshCw, Server, Cloud, CheckCircle, AlertTriangle, Upload } from 'lucide-react';
-import { StatusResponse, TriggerUploadResponse } from '../types';
+import { AlertTriangle, CheckCircle, Cloud, RefreshCw, Server, Upload } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { StorjUploaderAPI } from '../api';
+import { StatusResponse, TriggerUploadResponse } from '../types';
 
 const SystemStatus: React.FC = () => {
   const [status, setStatus] = useState<StatusResponse | null>(null);

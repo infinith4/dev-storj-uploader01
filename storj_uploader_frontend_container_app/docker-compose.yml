@@ -17,7 +17,7 @@ services:
     environment:
       - UPLOAD_TARGET_DIR=../storj_container_app/upload_target
       - TEMP_DIR=./temp
-      - MAX_FILE_SIZE=100000000
+      - MAX_FILE_SIZE=2000000000
     volumes:
       - ../storj_container_app:/app/storj_container_app
       - ./temp:/app/temp
