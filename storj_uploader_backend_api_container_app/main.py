@@ -476,7 +476,7 @@ async def openapi_spec():
 UPLOAD_TARGET_DIR = storj_client.get_upload_target_dir()
 UPLOADED_DIR = storj_client.get_uploaded_dir()
 TEMP_DIR = Path(os.getenv('TEMP_DIR', '/mnt/temp'))
-MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', '100000000'))  # 100MB
+MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', '2000000000'))  # 2GB
 SUPPORTED_IMAGE_FORMATS = {'jpeg', 'jpg', 'png', 'heic', 'heif', 'webp', 'bmp', 'tiff'}
 MIRROR_BLOB_TO_LOCAL = os.getenv('MIRROR_BLOB_TO_LOCAL', 'true').lower() == 'true'
 

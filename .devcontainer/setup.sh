@@ -89,7 +89,7 @@ if [ ! -f storj_uploader_backend_api_container_app/.env ]; then
     cat > storj_uploader_backend_api_container_app/.env <<EOF
 UPLOAD_TARGET_DIR=../storj_container_app/upload_target
 TEMP_DIR=./temp
-MAX_FILE_SIZE=100000000
+MAX_FILE_SIZE=2000000000
 API_HOST=0.0.0.0
 API_PORT=8010
 EOF

@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 This is a **Storj file uploader system** with four main components:
+
 1. **storj_container_app** - Core Python uploader using rclone
 2. **storj_uploader_backend_api_container_app** - FastAPI backend with OpenAPI v3
 3. **storj_uploader_frontend_container_app** - React + TypeScript frontend
@@ -15,6 +16,7 @@ The system allows users to upload files (images, videos, documents, etc.) throug
 ## Architecture
 
 ### Data Flow
+
 ```
 Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
 ```
@@ -28,6 +30,7 @@ Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App
 ### Component Details
 
 #### storj_container_app (Python + rclone)
+
 - **Main script**: `storj_uploader.py` - Parallel file uploader with ThreadPoolExecutor
 - **Key features**:
   - Creates/checks Storj buckets automatically
@@ -39,6 +42,7 @@ Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App
 - **Environment**: Requires `rclone.conf` for Storj authentication
 
 #### storj_uploader_backend_api_container_app (FastAPI)
+
 - **Main script**: `main.py` - OpenAPI v3 compliant REST API
 - **Endpoints**:
   - `POST /upload` - Multiple image files (HEIC, JPEG, PNG, WebP, BMP, TIFF)
@@ -60,6 +64,7 @@ Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App
 - **CORS**: Allows localhost:9010, localhost:3000, 127.0.0.1:9010, 127.0.0.1:3000
 
 #### storj_uploader_frontend_container_app (React + TypeScript)
+
 - **Main components**:
   - `App.tsx` - Tab-based navigation (images/videos/files/gallery/status)
   - `UploaderTab.tsx` - Reusable upload interface for different file types
@@ -73,6 +78,7 @@ Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App
 - **Default port**: 9010 (production), 3000 (dev)
 
 #### android_storj_uploader (Kotlin Android)
+
 - **Main activities**:
   - `MainActivity.kt` - Photo grid view with upload status
   - `SettingsActivity.kt` - Upload list and manual trigger
@@ -101,12 +107,14 @@ code .
 ```
 
 自動的に以下がセットアップされます：
+
 - Python 3.11, Node.js 18, rclone
 - 全コンポーネントの依存関係（pip, npm）
 - 必要なディレクトリとテンプレート .env ファイル
 - ポートフォワーディング（8010, 9010, 3000）
 
 初回起動後に rclone を設定してください：
+
 ```bash
 rclone config
 cp ~/.config/rclone/rclone.conf storj_container_app/
@@ -117,6 +125,7 @@ cp ~/.config/rclone/rclone.conf storj_container_app/
 ## Common Development Commands
 
 ### Backend API Development
+
 ```bash
 cd storj_uploader_backend_api_container_app
 
@@ -139,6 +148,7 @@ docker-compose up --build
 ```
 
 ### Frontend Development
+
 ```bash
 cd storj_uploader_frontend_container_app
 
@@ -161,6 +171,7 @@ docker-compose up --build
 ```
 
 ### Storj Container App (Core Uploader)
+
 ```bash
 cd storj_container_app
 
@@ -182,7 +193,8 @@ docker-compose up
 
 ### Android App Development
 
-**Windows環境でのビルド:**
+**Windows 環境でのビルド:**
+
 ```cmd
 cd android_storj_uploader
 
@@ -202,7 +214,8 @@ gradlew.bat test
 gradlew.bat lint
 ```
 
-**Linux/Mac/Dev Container環境でのビルド:**
+**Linux/Mac/Dev Container 環境でのビルド:**
+
 ```bash
 cd android_storj_uploader
 
@@ -217,6 +230,7 @@ chmod +x gradlew
 ```
 
 **エミュレータでの実行:**
+
 ```bash
 # List available emulators
 emulator -list-avds
@@ -230,6 +244,7 @@ adb shell am start -n com.example.storjapp.debug/com.example.storjapp.MainActivi
 ```
 
 **ログの確認:**
+
 ```bash
 # Real-time logs
 adb logcat -s MainActivity:D PhotoRepository:D ImageViewerActivity:D
@@ -238,34 +253,39 @@ adb logcat -s MainActivity:D PhotoRepository:D ImageViewerActivity:D
 adb logcat > app_log.txt
 ```
 
-詳細は `android_storj_uploader/README.md` を参照してください（Windows専用手順あり）。
+詳細は `android_storj_uploader/README.md` を参照してください（Windows 専用手順あり）。
 
 ## Key Configuration Files
 
 ### Backend (.env)
+
 - `UPLOAD_TARGET_DIR`: Path to storj_container_app/upload_target
 - `TEMP_DIR`: Temporary file storage
-- `MAX_FILE_SIZE`: Max upload size in bytes (default: 100MB)
+- `MAX_FILE_SIZE`: Max upload size in bytes (default: 2GB)
 - `API_HOST`: API server host (default: 0.0.0.0)
 - `API_PORT`: API server port (default: 8010)
 - `API_BASE_URL`: Base URL for generating image URLs (default: http://10.0.2.2:8010)
 
 ### Storj Container App (.env)
+
 - `STORJ_BUCKET_NAME`: Storj bucket name
 - `STORJ_REMOTE_NAME`: rclone remote name (default: storj)
 - `HASH_LENGTH`: Hash substring length for deduplication (default: 10)
 - `MAX_WORKERS`: Parallel upload workers (default: 8)
 
 ### Frontend (.env)
+
 - `REACT_APP_API_URL`: Backend API URL (default: http://localhost:8010)
 
 ### Android App Configuration
+
 - **RetrofitClient.kt**: `BASE_URL = "http://10.0.2.2:8010/"` (エミュレータ用)
-- **実機の場合**: BASE_URLをPCのローカルIPに変更して再ビルド
+- **実機の場合**: BASE_URL を PC のローカル IP に変更して再ビルド
 
 ## Important Implementation Notes
 
 ### File Upload Flow
+
 1. Frontend/Android sends files to `/upload` (images) or `/upload/files` (all files)
 2. Backend validates file size and format (images only for `/upload`)
 3. Backend generates unique filename with timestamp + UUID
@@ -278,6 +298,7 @@ adb logcat > app_log.txt
 10. Successfully uploaded/skipped files moved to `uploaded/`
 
 ### Deduplication Logic
+
 - Files are deduplicated by **base name + MD5 hash** (first 10 chars)
 - Format: `basename_hash.ext` or `basename_hash_timestamp.ext`
 - The `parse_filename_with_hash()` function extracts components
@@ -285,18 +306,21 @@ adb logcat > app_log.txt
 - Duplicate files are moved to `uploaded/` without re-uploading
 
 ### Parallel Processing
+
 - Storj uploader uses `ThreadPoolExecutor` with 8 workers (default)
 - Each thread has its own temp directory to avoid conflicts
 - Thread-safe operations use `self.lock` for console output and file moves
 - Background tasks in FastAPI use `BackgroundTasks` for async file moves
 
 ### Date-based Directory Structure
+
 - Files uploaded to `YYYYMM` directories in Storj
 - Date extracted from filename pattern: `YYYY-MM-DD_HH-MM-SS` (e.g., smartphone photos)
 - Falls back to file creation time if pattern not found
 - Implemented in `get_file_date()` and `extract_date_from_filename()`
 
 ### Image URL Construction (Android App)
+
 - **Critical**: Backend API's `BASE_URL` has trailing slash: `"http://10.0.2.2:8010/"`
 - **Important**: Always use `trimEnd('/')` when constructing URLs to prevent double slashes
 - Example in ImageViewerActivity.kt:
@@ -308,6 +332,7 @@ adb logcat > app_log.txt
 - Query parameter: `thumbnail=true` for thumbnails, `thumbnail=false` for full-size
 
 ### Android Theme Requirements
+
 - ImageViewerActivity requires AppCompat-based theme
 - Use `Theme.Material3.DayNight.NoActionBar` or descendants
 - Never use `@android:style` themes with AppCompatActivity
@@ -315,6 +340,7 @@ adb logcat > app_log.txt
 ## Testing
 
 ### Backend API Testing
+
 ```bash
 # Health check
 curl http://localhost:8010/health
@@ -339,6 +365,7 @@ curl -X POST http://localhost:8010/trigger-upload-async
 ```
 
 ### Directory Structure Verification
+
 ```bash
 # Check file counts
 ls -la storj_container_app/upload_target/
@@ -354,38 +381,46 @@ docker logs -f storj_container_app-storj_container_app-1
 ## Troubleshooting
 
 ### Storj Container App Not Found
+
 - Backend looks for storj_container_app at `/app/storj_container_app` (Docker) or `../storj_container_app` (local)
 - Verify `docker-compose.yml` volume mounts are correct
 - Check `StorjClient.__init__()` path resolution in `storj_client.py`
 
 ### Files Not Auto-Uploading
+
 - Auto-upload only triggers when ≥5 files in `upload_target/`
 - Check `save_file_to_target()` in `main.py` for trigger logic
 - Use manual trigger endpoints for immediate upload
 
 ### Duplicate File Detection Issues
+
 - Ensure filename follows format: `basename_hash.ext`
 - Hash length must match `HASH_LENGTH` env var (default: 10)
 - Check `_is_temp_hash_file()` isn't filtering files incorrectly
 
 ### rclone Configuration
+
 - `rclone.conf` must be present in storj_container_app directory
 - Test with: `rclone lsd storj:` (should list buckets)
 - Verify remote name matches `STORJ_REMOTE_NAME` in .env
 
 ### Android Image Loading Failures (404 Errors)
+
 - Check for double slashes in URLs (`//storj/images`)
 - Ensure `trimEnd('/')` is used when constructing image URLs
 - Verify backend is returning proper thumbnail_url and url fields
 - Check logcat: `adb logcat | grep -E "ImageViewerActivity|PhotoRepository"`
 
 ## OpenAPI v3 Documentation
+
 The backend API is fully documented with OpenAPI v3:
+
 - Interactive docs: http://localhost:8010/docs
 - Detailed docs: http://localhost:8010/redoc
 - JSON schema: http://localhost:8010/openapi.json
 
 All endpoints have:
+
 - Detailed descriptions
 - Request/response schemas (Pydantic models in `models.py`)
 - Error response examples
@@ -394,6 +429,7 @@ All endpoints have:
 ## GitHub Actions CI/CD
 
 ### Android App
+
 - **Workflow**: `.github/workflows/android-build.yml`
 - **Triggers**: Push/PR to any branch, tag push
 - **Tasks**: Build debug APK, run tests, lint check
@@ -403,7 +439,7 @@ All endpoints have:
 
 ## Documentation Files
 
-- `android_storj_uploader/README.md` - Android app setup (Windows専用手順)
+- `android_storj_uploader/README.md` - Android app setup (Windows 専用手順)
 - `android_storj_uploader/SCREEN_DESIGN.md` - 画面設計書・画面遷移図
 - `android_storj_uploader/RELEASE.md` - リリースビルドとデプロイ
 - `.devcontainer/README.md` - Dev Container setup guide
