@@ -69,7 +69,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       print('DEBUG _loadSystemStatus: Fetching status...');
       final status = await ApiService().getStatus();
       print('DEBUG _loadSystemStatus: Got status - storjServiceRunning: ${status.storjServiceRunning}');
-      print('DEBUG _loadSystemStatus: uploadQueueCount: ${status.uploadQueueCount}, totalUploaded: ${status.totalUploaded}');
+      print('DEBUG _loadSystemStatus: uploadQueueCount: ${status.uploadQueueCount}, totalUploaded: ${status.storjFileCount}');
       if (mounted) {
         setState(() {
           _systemStatus = status;
@@ -348,7 +348,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: UIConstants.smallPadding),
                   if (_systemStatus != null) ...[
                     _buildStatItem('Queue Count', '${_systemStatus!.uploadQueueCount}'),
-                    _buildStatItem('Total Uploaded', '${_systemStatus!.totalUploaded}'),
+                    _buildStatItem('Total Uploaded', '${_systemStatus!.storjFileCount}'),
                     _buildStatItem('Last Upload', _systemStatus!.lastUploadTime.isNotEmpty
                         ? _systemStatus!.lastUploadTime
                         : 'Never'),

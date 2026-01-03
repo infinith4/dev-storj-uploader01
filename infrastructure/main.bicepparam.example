@@ -42,3 +42,12 @@ access_grant = your-storj-access-grant-here
 param maxFileSize = 100000000  // 100MB
 param hashLength = 10
 param maxWorkers = 8
+// Container resources
+param backendCpu = '0.5'
+param backendMemory = '1.0Gi'
+param frontendCpu = '0.5'
+param frontendMemory = '1.0Gi'
+param flutterCpu = '0.5'
+param flutterMemory = '1.0Gi'
+param storjCpu = '0.5'
+param storjMemory = '1.0Gi'

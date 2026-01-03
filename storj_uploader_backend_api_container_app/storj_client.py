@@ -254,12 +254,7 @@ class StorjClient:
 
         try:
             target_files = self.count_files_in_target()
-            if self.blob_helper:
-                uploaded_files = self.blob_helper.get_blob_count(
-                    container_name=self.blob_helper.uploaded_container
-                )
-            else:
-                uploaded_files = len([f for f in uploaded_dir.iterdir() if f.is_file()]) if uploaded_dir.exists() else 0
+            uploaded_files = self._count_uploaded_files_excluding_thumbnails()
 
             storj_app_local = self.check_storj_app_available()
             cloud_env = os.getenv("CLOUD_ENV", "").lower()
@@ -288,6 +283,7 @@ class StorjClient:
                 "uploaded_dir": str(uploaded_dir),
                 "files_in_target": target_files,
                 "files_uploaded": uploaded_files,
+                "storj_files_count": uploaded_files,
                 "target_dir_exists": target_dir.exists() or bool(self.blob_helper),
                 "uploaded_dir_exists": uploaded_dir.exists() or bool(self.blob_helper)
             }
@@ -527,6 +523,94 @@ class StorjClient:
         except Exception as e:
             print(f"Error listing Storj images: {str(e)}")
             return False, [], str(e)
+
+    def _count_uploaded_files_excluding_thumbnails(self) -> int:
+        """
+        Count uploaded files excluding thumbnails (works for both Azure Blob and Storj bucket).
+        """
+        try:
+            def is_thumbnail(name: str) -> bool:
+                lower = name.lower()
+                return "_thumb_" in lower or lower.endswith("_thumb.jpg")
+
+            gallery_source = os.getenv("GALLERY_SOURCE", "").lower()
+
+            # Azure/Blob mode
+            if gallery_source in ("azure", "blob", "storage") and self.blob_helper:
+                container_name = os.getenv("AZURE_STORAGE_UPLOADED_CONTAINER", "uploaded")
+                names = self.blob_helper.list_blobs(container_name=container_name)
+                return len([n for n in names if n and not is_thumbnail(Path(n).name)])
+
+            # Storj via rclone
+            bucket_name = os.getenv("STORJ_BUCKET_NAME", "storj-upload-bucket")
+            remote_name = os.getenv("STORJ_REMOTE_NAME", "storj")
+            env, error_message = self._get_rclone_env()
+            if error_message:
+                print(f"Error getting rclone env: {error_message}")
+                return 0
+
+            cmd = [
+                "rclone",
+                "lsf",
+                f"{remote_name}:{bucket_name}/",
+                "--format",
+                "p",
+                "--recursive",
+            ]
+
+            result = subprocess.run(
+                cmd,
+                cwd=str(self.storj_app_path),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or "Unknown error"
+                print(f"rclone lsf failed while counting files: {error_msg}")
+                return 0
+
+            count = 0
+            media_exts = (
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".heic",
+                ".webp",
+                ".bmp",
+                ".tiff",
+                ".gif",
+                ".mp4",
+                ".mov",
+                ".avi",
+                ".mkv",
+                ".webm",
+                ".m4v",
+                ".3gp",
+                ".flv",
+                ".wmv",
+            )
+
+            for line in result.stdout.splitlines():
+                name = line.strip()
+                if not name:
+                    continue
+                filename = Path(name).name
+                if is_thumbnail(filename):
+                    continue
+                if not filename.lower().endswith(media_exts):
+                    continue
+                count += 1
+
+            return count
+        except subprocess.TimeoutExpired:
+            print("Timed out counting Storj files")
+            return 0
+        except Exception as e:
+            print(f"Error counting uploaded files: {e}")
+            return 0
 
     def _is_video_path(self, path: str) -> bool:
         if not path:

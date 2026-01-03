@@ -52,6 +52,12 @@ param useKeyVault bool = true
 @secure()
 param rcloneConfig string = ''
 
+@description('vCPU requested for the Storj uploader container (e.g., 0.5, 1.0)')
+param cpu string = '0.5'
+
+@description('Memory requested for the Storj uploader container (e.g., 1.0Gi)')
+param memory string = '1.0Gi'
+
 resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
@@ -67,39 +73,49 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
         transport: 'http'
         allowInsecure: true
       }
-      secrets: concat([
-        {
-          name: 'storage-key'
-          value: storageAccountKey
-        }
-        {
-          name: 'storage-connection-string'
-          value: storageConnectionString
-        }
-      ], useKeyVault && !empty(keyVaultUri) ? [
-        {
-          name: 'rclone-config'
-          keyVaultUrl: '${keyVaultUri}secrets/rclone-config'
-          identity: 'system'
-        }
-      ] : [
-        {
-          name: 'rclone-config'
-          value: rcloneConfig
-        }
-      ], empty(containerRegistryPassword) ? [] : [
-        {
-          name: 'registry-password'
-          value: containerRegistryPassword
-        }
-      ])
-      registries: empty(containerRegistryServer) ? [] : [
-        {
-          server: containerRegistryServer
-          username: containerRegistryUsername
-          passwordSecretRef: 'registry-password'
-        }
-      ]
+      secrets: concat(
+        [
+          {
+            name: 'storage-key'
+            value: storageAccountKey
+          }
+          {
+            name: 'storage-connection-string'
+            value: storageConnectionString
+          }
+        ],
+        useKeyVault && !empty(keyVaultUri)
+          ? [
+              {
+                name: 'rclone-config'
+                keyVaultUrl: '${keyVaultUri}secrets/rclone-config'
+                identity: 'system'
+              }
+            ]
+          : [
+              {
+                name: 'rclone-config'
+                value: rcloneConfig
+              }
+            ],
+        empty(containerRegistryPassword)
+          ? []
+          : [
+              {
+                name: 'registry-password'
+                value: containerRegistryPassword
+              }
+            ]
+      )
+      registries: empty(containerRegistryServer)
+        ? []
+        : [
+            {
+              server: containerRegistryServer
+              username: containerRegistryUsername
+              passwordSecretRef: 'registry-password'
+            }
+          ]
     }
     template: {
       containers: [
@@ -107,8 +123,8 @@ resource storjUploader 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'storj-uploader'
           image: containerImage
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json(cpu)
+            memory: memory
           }
           env: [
             {

@@ -120,6 +120,7 @@ class StatusResponse {
   final int totalUploaded;
   final String lastUploadTime;
   final bool storjServiceRunning;
+  final int storjFileCount;
   final Map<String, dynamic> statistics;
 
   // Additional fields from API response
@@ -131,6 +132,7 @@ class StatusResponse {
     required this.totalUploaded,
     required this.lastUploadTime,
     required this.storjServiceRunning,
+    required this.storjFileCount,
     required this.statistics,
     this.apiInfo,
     this.storjStatus,
@@ -162,7 +164,7 @@ class StatusResponse {
 
     // Extract values from nested structure
     final filesInTarget = storjStatusJson?['files_in_target'] ?? apiInfoJson?['files_in_target'] ?? 0;
-    final filesUploaded = storjStatusJson?['files_uploaded'] ?? 0;
+    final filesUploaded = storjStatusJson?['storj_files_count'] ?? storjStatusJson?['files_uploaded'] ?? 0;
     final storjAppMode = storjStatusJson?['storj_app_mode']?.toString() ?? 'unknown';
     final storjAppAvailable = _parseBool(storjStatusJson?['storj_app_available']);
     final storjRunning = storjAppAvailable || storjAppMode == 'remote';
@@ -173,6 +175,7 @@ class StatusResponse {
     return StatusResponse(
       uploadQueueCount: filesInTarget is int ? filesInTarget : 0,
       totalUploaded: filesUploaded is int ? filesUploaded : 0,
+      storjFileCount: filesUploaded is int ? filesUploaded : 0,
       lastUploadTime: json['last_upload_time'] ?? '',
       storjServiceRunning: storjRunning,
       statistics: json['statistics'] ?? {},
@@ -221,6 +224,7 @@ class StorjStatus {
   final String uploadedDir;
   final int filesInTarget;
   final int filesUploaded;
+  final int storjFilesCount;
   final bool targetDirExists;
   final bool uploadedDirExists;
 
@@ -232,6 +236,7 @@ class StorjStatus {
     required this.uploadedDir,
     required this.filesInTarget,
     required this.filesUploaded,
+    required this.storjFilesCount,
     required this.targetDirExists,
     required this.uploadedDirExists,
   });
@@ -245,6 +250,7 @@ class StorjStatus {
       uploadedDir: json['uploaded_dir'] ?? '',
       filesInTarget: json['files_in_target'] ?? 0,
       filesUploaded: json['files_uploaded'] ?? 0,
+      storjFilesCount: json['storj_files_count'] ?? json['files_uploaded'] ?? 0,
       targetDirExists: json['target_dir_exists'] ?? false,
       uploadedDirExists: json['uploaded_dir_exists'] ?? false,
     );

@@ -52,6 +52,12 @@ param gallerySource string = 'storj'
 @description('Max file size in bytes')
 param maxFileSize int = 100000000
 
+@description('vCPU requested for the backend container (e.g., 0.5, 1.0)')
+param cpu string = '0.5'
+
+@description('Memory requested for the backend container (e.g., 1.0Gi)')
+param memory string = '1.0Gi'
+
 @description('API Base URL for generating image URLs')
 param apiBaseUrl string
 
@@ -61,9 +67,11 @@ param mediaCdnBaseUrl string = ''
 resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
-  identity: (enableManagedIdentity || (useKeyVault && !empty(keyVaultUri))) ? {
-    type: 'SystemAssigned'
-  } : null
+  identity: (enableManagedIdentity || (useKeyVault && !empty(keyVaultUri)))
+    ? {
+        type: 'SystemAssigned'
+      }
+    : null
   properties: {
     environmentId: environmentId
     configuration: {
@@ -88,35 +96,45 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
           ]
         }
       }
-      secrets: concat([
-        {
-          name: 'storage-key'
-          value: storageAccountKey
-        }
-      ], useKeyVault && !empty(keyVaultUri) ? [
-        {
-          name: 'rclone-config'
-          keyVaultUrl: '${keyVaultUri}secrets/rclone-config'
-          identity: 'system'
-        }
-      ] : [
-        {
-          name: 'rclone-config'
-          value: rcloneConfig
-        }
-      ], empty(containerRegistryPassword) ? [] : [
-        {
-          name: 'registry-password'
-          value: containerRegistryPassword
-        }
-      ])
-      registries: empty(containerRegistryServer) ? [] : [
-        {
-          server: containerRegistryServer
-          username: containerRegistryUsername
-          passwordSecretRef: 'registry-password'
-        }
-      ]
+      secrets: concat(
+        [
+          {
+            name: 'storage-key'
+            value: storageAccountKey
+          }
+        ],
+        useKeyVault && !empty(keyVaultUri)
+          ? [
+              {
+                name: 'rclone-config'
+                keyVaultUrl: '${keyVaultUri}secrets/rclone-config'
+                identity: 'system'
+              }
+            ]
+          : [
+              {
+                name: 'rclone-config'
+                value: rcloneConfig
+              }
+            ],
+        empty(containerRegistryPassword)
+          ? []
+          : [
+              {
+                name: 'registry-password'
+                value: containerRegistryPassword
+              }
+            ]
+      )
+      registries: empty(containerRegistryServer)
+        ? []
+        : [
+            {
+              server: containerRegistryServer
+              username: containerRegistryUsername
+              passwordSecretRef: 'registry-password'
+            }
+          ]
     }
     template: {
       containers: [
@@ -124,8 +142,8 @@ resource backendApi 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'backend-api'
           image: containerImage
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json(cpu)
+            memory: memory
           }
           env: [
             {
