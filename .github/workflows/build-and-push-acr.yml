@@ -160,3 +160,42 @@ jobs:
             --output table
 
           echo "✓ Container App updated successfully"
+
+  restart-container-apps:
+    needs: update-container-apps
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Restart active revisions
+        run: |
+          set -euo pipefail
+
+          restart_app() {
+            local app_name="$1"
+            echo "Restarting active revision for $app_name ..."
+            local rev
+            rev=$(az containerapp revision list \
+              --name "$app_name" \
+              --resource-group "$RESOURCE_GROUP" \
+              --query "[?properties.active].name" -o tsv)
+            if [ -z "$rev" ]; then
+              echo "No active revision found for $app_name"
+              return 1
+            fi
+            az containerapp revision restart \
+              --name "$app_name" \
+              --resource-group "$RESOURCE_GROUP" \
+              --revision "$rev"
+          }
+
+          restart_app stjup2-backend-udm3tutq7eb7i
+          restart_app stjup2-frontend-udm3tutq7eb7i
+          restart_app stjup2-flutter-udm3tutq7eb7i
+          restart_app stjup2-storj-udm3tutq7eb7i

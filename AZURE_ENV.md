@@ -10,6 +10,8 @@
 | **リージョン**       | Japan East       |
 | **ベース名**         | `stjup2`         |
 | **環境サフィックス** | `udm3tutq7eb7i`  |
+| **Container Apps ドメイン** | `yellowplant-e4c48860.japaneast.azurecontainerapps.io` |
+| **CDN エンドポイント** | `cdn-udm3tutq7eb7i.z01.azurefd.net` (Azure Front Door Standard) |
 
 ## デプロイ済みリソース一覧
 
@@ -26,19 +28,23 @@
 - **名前**: `stjup2-frontend-udm3tutq7eb7i`
 - **タイプ**: コンテナー アプリ
 - **URL**: https://stjup2-frontend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io
+- **スケール/Ingress**: min 1 / max 1、external HTTPS、targetPort 9010
 - **コンテナイメージ**: `stjup2acrudm3tutq7eb7i.azurecr.io/storj-frontend:latest`
-- **認証**: Azure AD EasyAuth 有効
+- **認証**: Azure AD EasyAuth 有効 (テナント `9c181bf2-8930-409f-9cc2-5651ceb84475`、クライアント `5688f334-1e0a-421d-a1d7-b951cdffab3a`)
+- **環境変数**: `REACT_APP_API_URL` / `BACKEND_URL` → Backend API
 - **用途**: React + TypeScript フロントエンド（デスクトップ/タブレット向け）
 
 #### 2. フロントエンド - Flutter Web (Flutter App)
 
 - **名前**: `stjup2-flutter-udm3tutq7eb7i`
 - **タイプ**: コンテナー アプリ
-- **URL**: https://stjup2-flutter-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io _(要デプロイ)_
+- **URL**: https://stjup2-flutter-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io
+- **スケール/Ingress**: min 1 / max 1、external HTTPS、targetPort 80
 - **コンテナイメージ**: `stjup2acrudm3tutq7eb7i.azurecr.io/storj-flutter:latest`
+- **認証**: Azure AD EasyAuth 有効 (React と同一アプリ)
 - **用途**: Flutter Web アプリ（モバイル/デスクトップ/Web 対応）
 - **設定**:
-  - `.env` ファイルで API URL を設定
+  - `API_BASE_URL` は Docker build-arg で埋め込み
   - nginx で静的ファイルを配信
   - CORS はバックエンド側で処理
 
@@ -48,15 +54,33 @@
 - **タイプ**: コンテナー アプリ
 - **URL**: https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io
 - **コンテナイメージ**: `stjup2acrudm3tutq7eb7i.azurecr.io/storj-backend:latest`
+- **スケール/Ingress**: min 1 / max 5、external HTTPS、HTTP スケール (targetPort 8010)
 - **内部通信**: Container Apps 環境内で他のアプリと通信可能
-- **CORS 設定**: React/Flutter フロントエンド、ローカル開発環境からのアクセスを許可
+- **環境変数 (主要)**:
+  - `MEDIA_CDN_BASE_URL` / `CDN_BASE_URL`: `https://cdn-udm3tutq7eb7i.z01.azurefd.net`
+  - `GALLERY_SOURCE=storj`, `STORJ_BUCKET_NAME=stg-storj-uploader-01`, `STORJ_REMOTE_NAME=storj`
+  - `STORJ_CONTAINER_URL=http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process`
+  - `TEMP_DIR=/mnt/temp`, `UPLOAD_TARGET_DIR=/mnt/upload-target`, `MAX_FILE_SIZE=100000000`, `CLOUD_ENV=azure`
+- **ボリューム**: Azure Files `temp` → `/mnt/temp`, `thumbnail-cache` → `/app/thumbnail_cache`
+- **CORS 設定**: `*` (React/Flutter/ローカル開発を許可)
 
 #### 4. Storj アップローダー (Storj Container)
 
 - **名前**: `stjup2-storj-udm3tutq7eb7i`
 - **タイプ**: コンテナー アプリ
 - **コンテナイメージ**: `stjup2acrudm3tutq7eb7i.azurecr.io/storj-uploader:latest`
-- **用途**: rclone を使用した Storj クラウドストレージへのアップロード
+- **Ingress/スケール**: internal のみ (targetPort 8080)、min 0 / max 3、HTTP concurrency 1 でオートスケール
+- **エンドポイント**: `http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process`
+- **ボリューム**: Azure Files `temp` → `/mnt/temp`
+- **用途**: rclone を使用した Storj クラウドストレージへのアップロード (バックエンドから HTTP トリガー)
+
+### CDN (Azure Front Door Standard)
+
+- **プロファイル/エンドポイント**: `stjup2-cdn-udm3tutq7eb7i` / `cdn-udm3tutq7eb7i.z01.azurefd.net`
+- **オリジン**: `stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io`
+- **ルート**: `cache-images` (パターン `/storj/images/*`, `/assets/*`, HTTPS のみ、origin group `backend-origins`)
+- **役割**: ギャラリー/サムネイル配信を CDN キャッシュ。Backend が `MEDIA_CDN_BASE_URL` / `CDN_BASE_URL` を使用して CDN URL を返却。
+- **カスタムドメイン**: 未設定（必要なら追加可能）
 
 ### Container Registry (ACR)
 
@@ -67,8 +91,7 @@
 - **Admin User**: 有効
 - **レジストリサーバー**: `stjup2acrudm3tutq7eb7i.azurecr.io`
 - **ホストイメージ**:
-  - `storj-frontend:latest (React)
-  - storj-flutter:latest (Flutter Web)` (React)
+  - `storj-frontend:latest` (React)
   - `storj-flutter:latest` (Flutter Web)
   - `storj-backend:latest` (FastAPI)
   - `storj-uploader:latest` (rclone)
@@ -95,18 +118,20 @@
 - **名前**: `stjup2studm3tutq7eb7i`
 - **タイプ**: ストレージ アカウント
 - **リージョン**: Japan East
-- **用途**: ファイル共有 (Container Apps 間でのファイル共有)
+- **用途**: Azure Files による共有ストレージ
+- **ファイル共有**: `temp` (アップロードキュー/一時ファイル), `thumbnail-cache` (バックエンドのサムネイルキャッシュ)
+- **Blob コンテナー**: `upload-target`, `uploaded` (レガシー/オプション用途)
 
-## Azure AD 認証設定 (Frontend EasyAuth)
+## Azure AD 認証設定 (Frontend/Flutter EasyAuth)
 
-| 項目                         | 値                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------ |
-| **有効/無効**                | 有効                                                                                 |
-| **テナント ID**              | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`                                               |
-| **クライアント ID**          | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`                                               |
-| **クライアントシークレット** | `4BXXXXXXXXXX` (Key Vault に保存)                                                    |
-| **OpenID Issuer**            | `https://sts.windows.net/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/`                      |
-| **許可されたオーディエンス** | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`, `api://xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
+| 項目                         | 値                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **有効/無効**                | 有効 (Frontend / Flutter Web で EasyAuth 使用)                                                        |
+| **テナント ID**              | `9c181bf2-8930-409f-9cc2-5651ceb84475`                                                                |
+| **クライアント ID**          | `5688f334-1e0a-421d-a1d7-b951cdffab3a`                                                                |
+| **クライアントシークレット** | Key Vault `aad-client-secret` (値は Key Vault で管理)                                                |
+| **OpenID Issuer**            | `https://sts.windows.net/9c181bf2-8930-409f-9cc2-5651ceb84475/`                                       |
+| **許可されたオーディエンス** | `5688f334-1e0a-421d-a1d7-b951cdffab3a`, `api://5688f334-1e0a-421d-a1d7-b951cdffab3a`                 |
 
 ## Managed Identity
 
@@ -115,6 +140,7 @@
 | **有効/無効**      | 有効                                               |
 | **用途**           | ACR からのコンテナイメージプル、Key Vault アクセス |
 | **割り当てロール** | AcrPull (ACR に対して)                             |
+- 対象: backend / frontend / flutter / storj すべてで SystemAssigned を有効化。Storj/Backend には Key Vault Secrets User も付与。
 
 ## Storj 設定
 
@@ -129,13 +155,23 @@
 
 ### Backend API
 
-| 環境変数            | 値                                       |
-| ------------------- | ---------------------------------------- |
-| `MAX_FILE_SIZE`     | 100000000 (100MB)                        |
-| `API_HOST`          | 0.0.0.0                                  |
-| `API_PORT`          | 8010                                     |
-| `UPLOAD_TARGET_DIR` | `/app/storj_container_app/upload_target` |
-| `TEMP_DIR`          | `/app/temp`                              |
+| 環境変数                    | 値                                                                                           |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `API_HOST`                  | `0.0.0.0`                                                                                    |
+| `API_PORT`                  | `8010`                                                                                        |
+| `API_BASE_URL`              | `https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io`   |
+| `MEDIA_CDN_BASE_URL`/`CDN_BASE_URL` | `https://cdn-udm3tutq7eb7i.z01.azurefd.net` (ギャラリー応答を CDN URL で返却)                  |
+| `GALLERY_SOURCE`            | `storj`                                                                                       |
+| `STORJ_BUCKET_NAME`         | `stg-storj-uploader-01`                                                                      |
+| `STORJ_REMOTE_NAME`         | `storj`                                                                                       |
+| `STORJ_CONTAINER_URL`       | `http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process` |
+| `TEMP_DIR`                  | `/mnt/temp`                                                                                   |
+| `UPLOAD_TARGET_DIR`         | `/mnt/upload-target`                                                                          |
+| `MAX_FILE_SIZE`             | `100000000` (100MB)                                                                           |
+| `AZURE_STORAGE_ACCOUNT_NAME`| _(空)_                                                                                        |
+| `AZURE_STORAGE_ACCOUNT_KEY` | _(空)_                                                                                        |
+| `CLOUD_ENV`                 | `azure`                                                                                       |
+※ `RCLONE_CONFIG` は Key Vault (`rclone-config`) から参照。`/app/thumbnail_cache` は Azure Files `thumbnail-cache` にマウント。`UPLOAD_TARGET_DIR` はレガシー値で、実体は File Share `/mnt/temp` ベースのキュー運用。
 
 ### Storj Container App
 
@@ -145,6 +181,9 @@
 | `STORJ_REMOTE_NAME` | `storj`                 |
 | `HASH_LENGTH`       | 10                      |
 | `MAX_WORKERS`       | 8                       |
+| `FILE_SHARE_MOUNT`  | `/mnt/temp`             |
+| `PORT`              | `8080`                  |
+※ `RCLONE_CONFIG` は Key Vault (`rclone-config`) から読み込み。KEDA HTTP スケーラーで min 0 / max 3。
 
 ## GitHub Actions CI/CD
 
@@ -158,17 +197,21 @@
 
 - **Container Apps 環境**: 内部通信可能（同一環境内のアプリ同士）
 - **フロントエンド**: インターネット公開 (HTTPS)
-- **バックエンド**: インターネット公開 (HTTPS) ※必要に応じて内部のみに変更可能
-- **Storj アップローダー**: 外部からの直接アクセス不可（バックエンド経由で制御）
+- **バックエンド**: インターネット公開 (HTTPS)、Storj コンテナへは internal FQDN で通信
+- **CDN**: Azure Front Door Standard (`cdn-udm3tutq7eb7i.z01.azurefd.net`) で `/storj/images/*` `/assets/*` をキャッシュ
+- **Storj アップローダー**: 外部からの直接アクセス不可（バックエンド経由で internal エンドポイントを呼び出し）
 
 ## アクセス URL
 
 | サービス                       | URL                                                                                             | 用途                  |
 | ------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------- |
 | **フロントエンド**             | https://stjup2-frontend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io      | Web アプリケーション  |
+| **Flutter Web**                | https://stjup2-flutter-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io        | Web/モバイル向け UI   |
 | **バックエンド API**           | https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io       | REST API (OpenAPI v3) |
 | **API ドキュメント (Swagger)** | https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io/docs  | API 仕様確認          |
 | **API ドキュメント (ReDoc)**   | https://stjup2-backend-udm3tutq7eb7i.yellowplant-e4c48860.japaneast.azurecontainerapps.io/redoc | API 仕様確認          |
+| **CDN (media)**                | https://cdn-udm3tutq7eb7i.z01.azurefd.net                                                       | ギャラリー/アセット配信 |
+| **Storj Processor (internal)** | http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process | Backend からの HTTP トリガー |
 
 ## デプロイ方法
 
@@ -304,7 +347,7 @@ az keyvault set-policy \
 │       "status": "pending"                                │
 │     }                                                      │
 │  3. Trigger Storj Container via HTTP endpoint            │
-│     POST http://stjup2-storj-udm3tutq7eb7i/process       │
+│     POST http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process |
 └────────────────────────┬───────────────────────────────────┘
                          │
                          │ HTTP request triggers KEDA
@@ -344,6 +387,8 @@ az keyvault set-policy \
     └── upload-{uuid-4}.json
 ```
 
+補足: サムネイル生成キャッシュは Azure Files 共有 `thumbnail-cache` を Backend の `/app/thumbnail_cache` にマウントして保持。
+
 ### 環境変数の変更
 
 #### Backend API 環境変数 (更新)
@@ -351,10 +396,12 @@ az keyvault set-policy \
 | 環境変数                     | 値                                         | 説明                              |
 | ---------------------------- | ------------------------------------------ | --------------------------------- |
 | `TEMP_DIR`                   | `/mnt/temp`                                | ファイル一時保存先 (File Share)   |
-| `STORJ_CONTAINER_URL`        | `http://stjup2-storj-udm3tutq7eb7i/process` | Storj Container エンドポイント    |
+| `STORJ_CONTAINER_URL`        | `http://stjup2-storj-udm3tutq7eb7i.internal.yellowplant-e4c48860.japaneast.azurecontainerapps.io/process` | Storj Container (internal) エンドポイント |
+| `MEDIA_CDN_BASE_URL`/`CDN_BASE_URL` | `https://cdn-udm3tutq7eb7i.z01.azurefd.net` | ギャラリー/サムネイル配信用 CDN   |
+| `GALLERY_SOURCE`             | `storj`                                    | Storj バケットから一覧取得        |
 | `AZURE_STORAGE_ACCOUNT_NAME` | `` (空: Blob Storage 無効化)               | Blob Storage 無効                 |
 | `AZURE_STORAGE_ACCOUNT_KEY`  | `` (空: Blob Storage 無効化)               | Blob Storage 無効                 |
-| `UPLOAD_TARGET_DIR`          | (削除予定)                                 | 旧アーキテクチャの設定            |
+| `UPLOAD_TARGET_DIR`          | `/mnt/upload-target` (レガシー)            | 旧アーキテクチャの設定            |
 
 #### Storj Container App 環境変数 (更新)
 
@@ -381,6 +428,15 @@ az containerapp env storage set \
   --azure-file-account-key <storage_key> \
   --azure-file-share-name temp \
   --access-mode ReadWrite
+
+az containerapp env storage set \
+  --name stjup2-env-udm3tutq7eb7i \
+  --resource-group rg-dev-storjup \
+  --storage-name thumbnail-cache \
+  --azure-file-account-name stjup2studm3tutq7eb7i \
+  --azure-file-account-key <storage_key> \
+  --azure-file-share-name thumbnail-cache \
+  --access-mode ReadWrite
 ```
 
 #### Backend API Volume Mount
@@ -388,6 +444,10 @@ az containerapp env storage set \
 - Volume Name: `temp`
 - Storage Name: `temp`
 - Mount Path: `/mnt/temp`
+- Access Mode: ReadWrite
+- Volume Name: `thumbnail-cache`
+- Storage Name: `thumbnail-cache`
+- Mount Path: `/app/thumbnail_cache`
 - Access Mode: ReadWrite
 
 #### Storj Container App Volume Mount
@@ -418,6 +478,12 @@ az containerapp update \
 - **Min Replicas**: 0 (アイドル時は停止)
 - **Max Replicas**: 3 (並列処理用)
 - **Target Pending Requests**: 1 (リクエストがあれば起動)
+
+### CDN キャッシュ (2026-01-03 追加)
+
+- Azure Front Door Standard (`cdn-udm3tutq7eb7i.z01.azurefd.net`) で `/storj/images/*` `/assets/*` をキャッシュ
+- Backend の `MEDIA_CDN_BASE_URL` / `CDN_BASE_URL` を通してギャラリー URL を CDN ドメインで返却
+- React/Flutter Web は service worker 更新後に CDN 経由でメディアを取得
 
 ### 実装ステップ概要
 
@@ -495,6 +561,7 @@ az containerapp update \
 | ---------- | ------------------------------------------------------------------------------- |
 | 2025-12-31 | 初版作成 - 現在の Azure 環境の構成を文書化                                      |
 | 2026-01-02 | アーキテクチャ変更 - Azure File Share + KEDA HTTP イベント駆動スケーリング導入 |
+| 2026-01-03 | CDN (Azure Front Door) 追加、Backend/Frontend/Flutter のギャラリー配信を CDN 経由に更新 |
 
 ## コンテナの再起動
 

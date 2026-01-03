@@ -12,6 +12,16 @@ class ApiConstants {
     return 'http://localhost:8010';
   }
 
+  // Storj bucket (used when building media URLs)
+  static String get defaultBucketName {
+    final envBucket = dotenv.env['STORJ_BUCKET_NAME'] ?? dotenv.env['STORJ_BUCKET'];
+    if (envBucket != null && envBucket.isNotEmpty) {
+      return envBucket;
+    }
+    // Default public bucket used by the hosted backend
+    return 'stg-storj-uploader-01';
+  }
+
   // Endpoints
   static const String healthEndpoint = '/health';
   static const String statusEndpoint = '/status';

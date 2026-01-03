@@ -6,7 +6,7 @@ FastAPI + OpenAPI v3対応のファイルアップロードAPI
 HEICやJPEGなどの画像ファイル、動画ファイル、その他すべてのファイル形式に対応
 """
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Body
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
@@ -366,6 +366,9 @@ if storj_env_path.exists():
 # OpenAPI v3メタデータ設定
 app = FastAPI(
     title="Storj Uploader Backend API",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     description="""
     ## Storj Uploader Backend API
 
@@ -451,6 +454,23 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Length", "Content-Range", "Accept-Ranges", "Content-Type"],
 )
+
+@app.get("/", include_in_schema=False)
+async def root(request: Request):
+    """
+    Redirect the landing page to the interactive OpenAPI (Swagger UI).
+    """
+    docs_path = getattr(app, "docs_url", "/docs") or "/docs"
+    base_url = str(request.base_url).rstrip("/")
+    target = docs_path if docs_path.startswith("http") else f"{base_url}{docs_path}"
+    return RedirectResponse(url=target)
+
+@app.get("/openapi", include_in_schema=False)
+async def openapi_spec():
+    """
+    Convenience endpoint to view the OpenAPI v3 schema.
+    """
+    return JSONResponse(app.openapi())
 
 # 設定
 UPLOAD_TARGET_DIR = storj_client.get_upload_target_dir()
@@ -566,8 +586,8 @@ def _trigger_storj_processor():
         return False, "STORJ_CONTAINER_URL not set"
     try:
         req = urllib_request.Request(url, method="POST")
-        # KEDA HTTP scaler can take a few seconds to spin up a replica; allow a longer timeout
-        with urllib_request.urlopen(req, timeout=20) as resp:
+        # KEDA HTTP scaler can take 30-60 seconds to spin up a replica from 0; allow 90s timeout
+        with urllib_request.urlopen(req, timeout=90) as resp:
             _ = resp.read()
         print(f"Triggered Storj processor via HTTP: {url}")
         return True, "triggered"
@@ -1519,9 +1539,19 @@ async def get_storj_image(
                     if legacy_success and legacy_data:
                         success, image_data, error_msg = legacy_success, legacy_data, legacy_error
                     else:
-                        image_data = _generate_video_placeholder()
-                        success = True
-                        error_msg = "Placeholder (thumbnail not found)"
+                        # Generate thumbnail on-demand (synchronously for first request)
+                        print(f"⚠ Thumbnail not found in Storj, generating on-demand for: {image_path}")
+                        gen_success, gen_data, gen_error = _generate_video_thumbnail(
+                            video_path=image_path,
+                            bucket=bucket_name
+                        )
+                        if gen_success and gen_data:
+                            success, image_data, error_msg = gen_success, gen_data, gen_error
+                        else:
+                            print(f"✗ Failed to generate thumbnail: {gen_error}")
+                            image_data = _generate_video_placeholder()
+                            success = True
+                            error_msg = "Placeholder (thumbnail generation failed)"
             else:
                 success, image_data, error_msg = storj_client.get_storj_thumbnail(
                     image_path=image_path,

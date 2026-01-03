@@ -280,14 +280,18 @@ class ApiService {
   Future<StorjImageListResponse> getStorjImages({
     int limit = 100,
     int offset = 0,
+    String? bucket,
   }) async {
     try {
+      final bucketName = (bucket ?? ApiConstants.defaultBucketName).trim();
+      final queryParams = {
+        'limit': limit,
+        'offset': offset,
+        if (bucketName.isNotEmpty) 'bucket': bucketName,
+      };
       final response = await _client().get(
         '/storj/images',
-        queryParameters: {
-          'limit': limit,
-          'offset': offset,
-        },
+        queryParameters: queryParams,
       );
       if (response.data is! Map<String, dynamic>) {
         throw ApiException(message: 'Invalid gallery response');
@@ -320,9 +324,32 @@ class ApiService {
   }
 
   // Get Storj Image/Video URL
-  String getStorjMediaUrl(String path, {bool thumbnail = false}) {
-    final baseUrl = _client().options.baseUrl.replaceAll(RegExp(r'/$'), '');
-    return '$baseUrl/storj/images/$path?thumbnail=$thumbnail';
+  String getStorjMediaUrl(
+    String path, {
+    bool thumbnail = false,
+    String? bucket,
+  }) {
+    final bucketName = (bucket ?? ApiConstants.defaultBucketName).trim();
+    final baseUri = Uri.parse(_client().options.baseUrl);
+
+    // Build path segments safely to avoid malformed URLs when path contains spaces or symbols
+    final normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+    final segments = <String>[
+      ...baseUri.pathSegments.where((s) => s.isNotEmpty),
+      'storj',
+      'images',
+      ...normalizedPath.split('/').where((s) => s.isNotEmpty),
+    ];
+
+    final uri = baseUri.replace(
+      pathSegments: segments,
+      queryParameters: {
+        'thumbnail': thumbnail.toString(),
+        if (bucketName.isNotEmpty) 'bucket': bucketName,
+      },
+    );
+
+    return uri.toString();
   }
 
   // Get current base URL
