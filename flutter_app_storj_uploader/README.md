@@ -36,7 +36,30 @@ flutter run -d android
 flutter run -d chrome
 ```
 
-### Android APK Build
+### Android Development with Android Studio
+
+You can open and develop the Android part of this Flutter project directly in Android Studio:
+
+1. **Open in Android Studio**:
+   - Launch Android Studio
+   - Select "Open an Existing Project"
+   - Navigate to `flutter_app_storj_uploader/android/` and open it
+   - Android Studio will sync Gradle automatically
+
+2. **Run/Debug from Android Studio**:
+   - Select your device/emulator from the device dropdown
+   - Click the Run button (▶) or Debug button (🐛)
+   - The app will build and launch
+
+3. **Edit Native Android Code**:
+   - Open `app/src/main/kotlin/com/example/storj_uploader_flutter/MainActivity.kt`
+   - You can add native Android features using platform channels
+
+4. **Gradle Tasks**:
+   - Right-click on the project → Tasks → build → assembleDebug
+   - Or use Terminal in Android Studio: `./gradlew assembleDebug`
+
+### Android APK Build (Command Line)
 
 ```bash
 # Debug APK
@@ -51,6 +74,11 @@ flutter build apk --release
 
 # Install on connected device
 flutter install
+
+# Or use Gradle directly from android directory:
+cd android
+./gradlew assembleDebug        # Linux/Mac
+gradlew.bat assembleDebug      # Windows
 ```
 
 **Note**: For Android builds, you need to have Android SDK installed. The app requires:
