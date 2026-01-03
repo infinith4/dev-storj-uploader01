@@ -401,12 +401,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       const batchSize = 5;
       int successCount = 0;
       int failCount = 0;
+      final List<String> errorMessages = [];
 
       for (int i = 0; i < _uploadQueue.length; i += batchSize) {
         final batch = _uploadQueue.skip(i).take(batchSize).toList();
 
         for (final localFile in batch) {
           try {
+            UploadResponse response;
+
             // Web platform uses byte data instead of File I/O
             if (kIsWeb) {
               final isImage = FileTypeUtils.isImageFile(
@@ -415,25 +418,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
               if (localFile.webFile != null) {
                 print('Uploading file from browser FormData: ${localFile.name}');
-                await ApiService().uploadFromBrowserFile(
+                response = await ApiService().uploadFromBrowserFile(
                   localFile.webFile!,
                   isImage: isImage,
                 );
-                successCount++;
-                continue;
-              }
-
-              // Fallback to in-memory bytes when browser file is unavailable
-              if (localFile.bytes == null) {
+              } else if (localFile.bytes != null) {
+                print('Uploading file from bytes: ${localFile.name}');
+                response = await ApiService().uploadFromBytes(
+                  localFile.bytes!,
+                  localFile.name,
+                );
+              } else {
                 throw Exception('File data not available for web upload: ${localFile.name}');
               }
-
-              print('Uploading file from bytes: ${localFile.name}');
-              await ApiService().uploadFromBytes(
-                localFile.bytes!,
-                localFile.name,
-              );
-              successCount++;
             } else {
               // For non-web platforms, use file path
               final file = File(localFile.path);
@@ -450,15 +447,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
               print('Uploading file from path: ${localFile.name}');
               if (isImage) {
-                await ApiService().uploadSingleImage(file);
+                response = await ApiService().uploadSingleImage(file);
               } else {
-                await ApiService().uploadSingleFile(file);
+                response = await ApiService().uploadSingleFile(file);
               }
+            }
+
+            // Check response for individual file errors
+            bool hasError = false;
+            for (final result in response.results) {
+              if (result.isError) {
+                hasError = true;
+                final errorMsg = result.message ?? 'Unknown error';
+                errorMessages.add('${result.filename}: $errorMsg');
+                print('Upload error for ${result.filename}: $errorMsg');
+              }
+            }
+
+            if (hasError) {
+              failCount++;
+            } else {
               successCount++;
             }
           } catch (e) {
             print('Failed to upload ${localFile.name}: $e');
             failCount++;
+            // Extract error message from ApiException
+            String errorMsg = e.toString();
+            if (e is ApiException) {
+              errorMsg = e.message;
+            }
+            errorMessages.add('${localFile.name}: $errorMsg');
           }
         }
 
@@ -471,13 +490,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // Clear queue after upload attempt
       _clearQueue();
 
-      // Show result
+      // Show result with error details
       if (failCount == 0) {
         _showSnackBar('Successfully uploaded $successCount files!');
       } else if (successCount == 0) {
-        _showSnackBar('Failed to upload all files', isError: true);
+        _showUploadErrorDialog(errorMessages);
       } else {
-        _showSnackBar('Uploaded $successCount files, $failCount failed', isError: true);
+        _showUploadErrorDialog(errorMessages, successCount: successCount);
       }
 
       // Refresh system status to see updated counts
@@ -485,5 +504,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } catch (e) {
       _showSnackBar('Upload failed: $e', isError: true);
     }
+  }
+
+  void _showUploadErrorDialog(List<String> errors, {int successCount = 0}) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: const Color(UIConstants.errorColorValue)),
+              const SizedBox(width: 8),
+              const Text('Upload Errors'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (successCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      '$successCount file(s) uploaded successfully.',
+                      style: TextStyle(
+                        color: const Color(UIConstants.successColorValue),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                Text(
+                  '${errors.length} file(s) failed:',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...errors.map((error) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('• ', style: TextStyle(color: Colors.red)),
+                      Expanded(
+                        child: Text(
+                          error,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
