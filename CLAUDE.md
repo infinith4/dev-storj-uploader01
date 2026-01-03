@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Storj file uploader system** with four main components:
+This is a **Storj file uploader system** with five main components:
 1. **storj_container_app** - Core Python uploader using rclone
 2. **storj_uploader_backend_api_container_app** - FastAPI backend with OpenAPI v3
-3. **storj_uploader_frontend_container_app** - React + TypeScript frontend
-4. **android_storj_uploader** - Kotlin Android mobile app
+3. **storj_uploader_frontend_container_app** - React + TypeScript frontend (Web)
+4. **flutter_app_storj_uploader** - Flutter cross-platform app (Web + Android)
+5. **android_storj_uploader** - Kotlin Android native app (legacy)
 
 The system allows users to upload files (images, videos, documents, etc.) through web and mobile interfaces, which are then automatically uploaded to Storj cloud storage with intelligent deduplication and parallel processing.
 
@@ -16,10 +17,10 @@ The system allows users to upload files (images, videos, documents, etc.) throug
 
 ### Data Flow
 ```
-Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
+Frontend (React/Flutter) / Mobile App (Flutter/Kotlin) → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
 ```
 
-1. **Frontend/Android** sends files via POST to backend API endpoints
+1. **Frontend/Mobile** sends files via POST to backend API endpoints
 2. **Backend** validates files, saves to `temp/`, moves to `../storj_container_app/upload_target/`
 3. **Auto-trigger**: When ≥5 files accumulate, backend automatically calls storj_uploader.py
 4. **Storj Container App** uses rclone to upload to Storj with hash-based deduplication
@@ -72,7 +73,35 @@ Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App
 - **Styling**: Tailwind CSS with mobile-first responsive design
 - **Default port**: 9010 (production), 3000 (dev)
 
-#### android_storj_uploader (Kotlin Android)
+#### flutter_app_storj_uploader (Flutter - Web + Android)
+- **Main files**:
+  - `main.dart` - App entry point with Material Design 3
+  - `screens/home_screen.dart` - Main upload interface
+  - `widgets/file_upload_area.dart` - Cross-platform file selection (drag & drop on Web, picker on Android)
+  - `services/api_service.dart` - Dio HTTP client with error handling
+  - `services/file_service.dart` - Cross-platform file handling
+  - `models/api_models.dart` - API response models
+- **Key features**:
+  - **Cross-platform**: Web and Android support from single codebase
+  - File picker with camera/gallery integration on Android
+  - Drag & drop file upload on Web (using `flutter_dropzone`)
+  - Conditional imports for web-only packages
+  - Riverpod state management
+  - Material Design 3 with light/dark theme
+  - Auto-upload queue management
+- **Configuration**:
+  - `.env` file for API URL (supports Azure Container Apps)
+  - Environment variables loaded via `flutter_dotenv`
+  - Same API URL for both Web and Android builds
+- **Android requirements**:
+  - minSdkVersion: 24 (Android 7.0)
+  - targetSdkVersion: 34 (Android 14)
+  - Permissions: Internet, Storage, Camera, Media
+- **Deployment**:
+  - Web: Docker with nginx (deployed to Azure Container Apps)
+  - Android: APK build via `flutter build apk`
+
+#### android_storj_uploader (Kotlin Android - Legacy)
 - **Main activities**:
   - `MainActivity.kt` - Photo grid view with upload status
   - `SettingsActivity.kt` - Upload list and manual trigger
