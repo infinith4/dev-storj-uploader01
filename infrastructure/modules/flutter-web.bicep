@@ -13,6 +13,13 @@ param containerImage string
 @description('Enable system-assigned managed identity')
 param enableManagedIdentity bool = false
 
+// Note: Flutter web apps are static sites served by nginx.
+// The API_BASE_URL must be set at Docker build time using --build-arg API_BASE_URL=...
+// See .github/workflows/build-and-push-acr.yml for build configuration.
+// The following parameter is for documentation/reference only and is not used at runtime.
+@description('Backend API URL (for reference only - must be set at build time)')
+param backendApiUrl string = ''
+
 @description('Container registry server (e.g., myregistry.azurecr.io). Leave empty for public images')
 param containerRegistryServer string = ''
 
