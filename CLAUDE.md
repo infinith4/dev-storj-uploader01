@@ -95,8 +95,12 @@ Frontend (React/Flutter) / Mobile App (Flutter/Kotlin) → Backend API (FastAPI)
   - Same API URL for both Web and Android builds
 - **Android requirements**:
   - minSdkVersion: 24 (Android 7.0)
-  - targetSdkVersion: 34 (Android 14)
-  - Permissions: Internet, Storage, Camera, Media
+  - compileSdkVersion: 35 (Android 15)
+  - targetSdkVersion: 35 (Android 15)
+  - Kotlin: 2.0.21
+  - Android Gradle Plugin: 8.7.3
+  - Java: 17
+  - Permissions: Internet, Storage, Camera, Media (including Android 14+ partial access)
 - **Deployment**:
   - Web: Docker with nginx (deployed to Azure Container Apps)
   - Android: APK build via `flutter build apk`

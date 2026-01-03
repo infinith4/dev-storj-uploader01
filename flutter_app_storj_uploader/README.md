@@ -55,7 +55,11 @@ flutter install
 
 **Note**: For Android builds, you need to have Android SDK installed. The app requires:
 - minSdkVersion: 24 (Android 7.0)
-- targetSdkVersion: 34 (Android 14)
+- compileSdkVersion: 35 (Android 15)
+- targetSdkVersion: 35 (Android 15)
+- Kotlin: 2.0.21
+- Android Gradle Plugin: 8.7.3
+- Java: 17
 
 **Android Azure Connection**: The `.env` file is automatically included in the Android build, so the same Azure Backend URL configured for Web will be used for Android as well.
 
