@@ -57,6 +57,8 @@ flutter install
 - minSdkVersion: 24 (Android 7.0)
 - targetSdkVersion: 34 (Android 14)
 
+**Android Azure Connection**: The `.env` file is automatically included in the Android build, so the same Azure Backend URL configured for Web will be used for Android as well.
+
 ### Production (Docker)
 
 ```bash
