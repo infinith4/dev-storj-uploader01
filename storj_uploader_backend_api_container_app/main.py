@@ -595,6 +595,12 @@ def _trigger_storj_processor():
         print(f"Failed to trigger Storj processor: {e}")
         return False, str(e)
 
+def _schedule_trigger_after_upload(background_tasks: BackgroundTasks, success_count: int) -> None:
+    """Kick the Storj processor after successful uploads without blocking the response."""
+    if success_count <= 0:
+        return
+    background_tasks.add_task(_trigger_storj_processor)
+
 async def _enqueue_file(
     unique_filename: str,
     original_filename: str,
@@ -895,9 +901,11 @@ async def upload_images(
 
     # 複数ファイルを並列処理
     results = await asyncio.gather(*[process_single_image(file) for file in files])
+    success_count = len([r for r in results if r["status"] == "success"])
+    _schedule_trigger_after_upload(background_tasks, success_count)
 
     return {
-        "message": f"{len([r for r in results if r['status'] == 'success'])}個のファイルが正常にアップロードされました",
+        "message": f"{success_count}個のファイルが正常にアップロードされました",
         "results": results
     }
 
@@ -1020,9 +1028,11 @@ async def upload_files(
 
     # 複数ファイルを並列処理
     results = await asyncio.gather(*[process_single_file(file) for file in files])
+    success_count = len([r for r in results if r["status"] == "success"])
+    _schedule_trigger_after_upload(background_tasks, success_count)
 
     return {
-        "message": f"{len([r for r in results if r['status'] == 'success'])}個のファイルが正常にアップロードされました",
+        "message": f"{success_count}個のファイルが正常にアップロードされました",
         "results": results
     }
 
