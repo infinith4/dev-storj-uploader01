@@ -1174,22 +1174,36 @@ async def trigger_upload():
     - バックグラウンドで処理されるため、即座にレスポンスが返されます
     - 進行状況の確認はシステムログで行ってください
     - ファイルがない場合はエラーではなく 'no_files' ステータスを返します
+    - `force=true` パラメータでキューが空でもStorjコンテナを強制起動できます
     """
 )
-async def trigger_upload_async():
+async def trigger_upload_async(force: bool = False):
     """
     非同期でStorjアップロードを実行
+
+    Args:
+        force: Trueの場合、キューが空でもStorjコンテナを起動する
     """
     try:
         file_count = upload_queue.get_pending_count()
-        if file_count == 0:
+
+        # forceパラメータがない場合、キューが空ならno_filesを返す
+        if file_count == 0 and not force:
             return {
                 "status": "no_files",
-                "message": "アップロード対象のファイルがありません",
+                "message": "アップロード対象のファイルがありません（force=trueで強制起動可能）",
                 "files_count": 0
             }
 
         success, output = _trigger_storj_processor()
+
+        if file_count == 0 and force:
+            return {
+                "status": "started" if success else "error",
+                "message": "Storj コンテナを強制起動しました" if success else f"トリガーに失敗しました: {output}",
+                "files_count": 0,
+                "output": output
+            }
 
         return {
             "status": "started" if success else "error",
