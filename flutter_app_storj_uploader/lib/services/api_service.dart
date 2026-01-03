@@ -10,11 +10,11 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  late final Dio _dio;
+  Dio? _dio;
 
   void initialize({String? baseUrl}) {
     _dio = Dio(BaseOptions(
-      baseUrl: baseUrl ?? ApiConstants.defaultBaseUrl,
+      baseUrl: _normalizeBaseUrl(baseUrl ?? ApiConstants.defaultBaseUrl),
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 60),
       sendTimeout: const Duration(seconds: 60),
@@ -25,7 +25,7 @@ class ApiService {
     ));
 
     // Request/Response interceptors for logging
-    _dio.interceptors.add(InterceptorsWrapper(
+    _dio!.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         print('🚀 Request: ${options.method} ${options.path}');
         print('📤 Data: ${options.data}');
@@ -44,10 +44,23 @@ class ApiService {
     ));
   }
 
+  Dio _client({String? baseUrl}) {
+    // Reinitialize if not set or base URL changed
+    final normalized = baseUrl != null ? _normalizeBaseUrl(baseUrl) : null;
+    if (_dio == null || (normalized != null && _dio!.options.baseUrl != normalized)) {
+      initialize(baseUrl: normalized ?? ApiConstants.defaultBaseUrl);
+    }
+    return _dio!;
+  }
+
+  String _normalizeBaseUrl(String value) {
+    return value.replaceAll(RegExp(r'/$'), '');
+  }
+
   // Health Check
   Future<HealthResponse> healthCheck() async {
     try {
-      final response = await _dio.get('/health');
+      final response = await _client().get('/health');
       return HealthResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -57,7 +70,7 @@ class ApiService {
   // System Status
   Future<StatusResponse> getStatus() async {
     try {
-      final response = await _dio.get('/status');
+      final response = await _client().get('/status');
       return StatusResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -82,7 +95,7 @@ class ApiService {
         ));
       }
 
-      final response = await _dio.post(
+      final response = await _client().post(
         '/upload',
         data: formData,
         onSendProgress: onSendProgress,
@@ -110,7 +123,7 @@ class ApiService {
         ),
       });
 
-      final response = await _dio.post(
+      final response = await _client().post(
         '/upload/single',
         data: formData,
         onSendProgress: onSendProgress,
@@ -143,7 +156,7 @@ class ApiService {
         ));
       }
 
-      final response = await _dio.post(
+      final response = await _client().post(
         '/upload/files',
         data: formData,
         onSendProgress: onSendProgress,
@@ -171,7 +184,7 @@ class ApiService {
         ),
       });
 
-      final response = await _dio.post(
+      final response = await _client().post(
         '/upload/files/single',
         data: formData,
         onSendProgress: onSendProgress,
@@ -200,7 +213,7 @@ class ApiService {
         ),
       });
 
-      final response = await _dio.post(
+      final response = await _client().post(
         '/upload/files/single',
         data: formData,
         onSendProgress: onSendProgress,
@@ -222,7 +235,7 @@ class ApiService {
     Function(int sent, int total)? onSendProgress,
   }) async {
     final endpoint = isImage ? '/upload/single' : '/upload/files/single';
-    final base = Uri.parse(_dio.options.baseUrl);
+    final base = Uri.parse(_client().options.baseUrl);
     final url = base.resolve(endpoint);
 
     final data = await uploadBrowserFile(
@@ -236,7 +249,7 @@ class ApiService {
   // Trigger Manual Storj Upload
   Future<TriggerUploadResponse> triggerUpload() async {
     try {
-      final response = await _dio.post('/trigger-upload');
+      final response = await _client().post('/trigger-upload');
       return TriggerUploadResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -246,7 +259,7 @@ class ApiService {
   // Trigger Async Storj Upload
   Future<TriggerUploadResponse> triggerUploadAsync() async {
     try {
-      final response = await _dio.post('/trigger-upload-async');
+      final response = await _client().post('/trigger-upload-async');
       return TriggerUploadResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -269,7 +282,7 @@ class ApiService {
     int offset = 0,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _client().get(
         '/storj/images',
         queryParameters: {
           'limit': limit,
@@ -294,7 +307,7 @@ class ApiService {
   // Delete Storj Images/Videos
   Future<DeleteMediaResponse> deleteStorjMedia(List<String> paths) async {
     try {
-      final response = await _dio.post(
+      final response = await _client().post(
         '/storj/images/delete',
         data: {
           'paths': paths,
@@ -308,12 +321,12 @@ class ApiService {
 
   // Get Storj Image/Video URL
   String getStorjMediaUrl(String path, {bool thumbnail = false}) {
-    final baseUrl = _dio.options.baseUrl.replaceAll(RegExp(r'/$'), '');
+    final baseUrl = _client().options.baseUrl.replaceAll(RegExp(r'/$'), '');
     return '$baseUrl/storj/images/$path?thumbnail=$thumbnail';
   }
 
   // Get current base URL
-  String get baseUrl => _dio.options.baseUrl.replaceAll(RegExp(r'/$'), '');
+  String get baseUrl => _client().options.baseUrl.replaceAll(RegExp(r'/$'), '');
 }
 
 // Custom Exception for API errors

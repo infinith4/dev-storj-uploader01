@@ -26,7 +26,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
   String? _errorMessage;
   final ScrollController _scrollController = ScrollController();
   int _currentOffset = 0;
-  static const int _pageSize = 20;
+  // Smaller page size to reduce initial payload and speed up first paint
+  static const int _pageSize = 12;
   bool _hasMore = true;
   bool _isLoadingMore = false;
   GallerySortOption _sortOption = GallerySortOption.capturedDate;
@@ -658,6 +659,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
           CachedNetworkImage(
             imageUrl: thumbnailUrl,
             fit: BoxFit.cover,
+            // Reduce decode/cache size to speed up loading and cut bandwidth
+            memCacheWidth: 512,
+            memCacheHeight: 512,
+            maxWidthDiskCache: 512,
+            maxHeightDiskCache: 512,
             placeholder: (context, url) => _buildDefaultThumbnail(
               item,
               isLoading: true,
