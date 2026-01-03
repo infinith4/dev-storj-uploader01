@@ -157,10 +157,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           IconButton(
             icon: Icon(
-              Icons.flash_on,
+              _forceTriggerUpload ? Icons.flash_on : Icons.flash_off,
               color: _forceTriggerUpload
                   ? Theme.of(context).colorScheme.secondary
-                  : null,
+                  : Colors.grey.shade500,
             ),
             onPressed: _toggleForceTrigger,
             tooltip: _forceTriggerUpload
