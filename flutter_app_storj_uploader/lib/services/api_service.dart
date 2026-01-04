@@ -249,16 +249,12 @@ class ApiService {
   // Trigger Manual Storj Upload
   Future<TriggerUploadResponse> triggerUpload({bool force = false}) async {
     try {
-<<<<<<< HEAD
       final response = await _client().post(
         '/trigger-upload',
         queryParameters: {
           'force': force,
         },
       );
-=======
-      final response = await _client().post('/trigger-upload');
->>>>>>> remotes/origin/claude/android-mobile-compatibility-XDY7B
       return TriggerUploadResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -268,16 +264,12 @@ class ApiService {
   // Trigger Async Storj Upload
   Future<TriggerUploadResponse> triggerUploadAsync({bool force = false}) async {
     try {
-<<<<<<< HEAD
       final response = await _client().post(
         '/trigger-upload-async',
         queryParameters: {
           'force': force,
         },
       );
-=======
-      final response = await _client().post('/trigger-upload-async');
->>>>>>> remotes/origin/claude/android-mobile-compatibility-XDY7B
       return TriggerUploadResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
@@ -301,15 +293,12 @@ class ApiService {
     String? bucket,
   }) async {
     try {
-<<<<<<< HEAD
       final bucketName = (bucket ?? ApiConstants.defaultBucketName).trim();
       final queryParams = {
         'limit': limit,
         'offset': offset,
         if (bucketName.isNotEmpty) 'bucket': bucketName,
       };
-=======
->>>>>>> remotes/origin/claude/android-mobile-compatibility-XDY7B
       final response = await _client().get(
         '/storj/images',
         queryParameters: queryParams,
@@ -345,7 +334,6 @@ class ApiService {
   }
 
   // Get Storj Image/Video URL
-<<<<<<< HEAD
   String getStorjMediaUrl(
     String path, {
     bool thumbnail = false,
@@ -372,11 +360,6 @@ class ApiService {
     );
 
     return uri.toString();
-=======
-  String getStorjMediaUrl(String path, {bool thumbnail = false}) {
-    final baseUrl = _client().options.baseUrl.replaceAll(RegExp(r'/$'), '');
-    return '$baseUrl/storj/images/$path?thumbnail=$thumbnail';
->>>>>>> remotes/origin/claude/android-mobile-compatibility-XDY7B
   }
 
   // Get current base URL

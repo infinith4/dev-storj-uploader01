@@ -5,13 +5,9 @@ import 'package:uuid/uuid.dart';
 import '../models/api_models.dart';
 import '../services/file_service.dart';
 import '../utils/constants.dart';
-
-// Conditional imports for web-only packages
-// These are only imported when running on web platform
-// ignore: depend_on_referenced_packages, uri_does_not_exist
-import 'package:flutter_dropzone/flutter_dropzone.dart' if (dart.library.io) 'dart:core';
-// ignore: depend_on_referenced_packages, uri_does_not_exist
-import 'dart:html' as html if (dart.library.io) 'dart:core' show File;
+import 'dropzone_stub.dart'
+    if (dart.library.html) 'package:flutter_dropzone/flutter_dropzone.dart';
+import 'html_stub.dart' if (dart.library.html) 'dart:html' as html;
 
 class FileUploadArea extends StatefulWidget {
   final Function(List<LocalFile>) onFilesSelected;
