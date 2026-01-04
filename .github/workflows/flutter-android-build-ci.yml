@@ -21,7 +21,7 @@ on:
 
 jobs:
   build-android:
-    name: Build Flutter Android APK (Debug)
+    name: Build Flutter Android APKs
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -74,4 +74,35 @@ jobs:
         with:
           name: flutter-app-debug
           path: flutter_app_storj_uploader/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Decode release keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties << 'EOF'
+          storeFile=app/upload-keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          EOF
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-app-release
+          path: flutter_app_storj_uploader/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Build Release APKs (Split ABI)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload Split APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-app-release-split
+          path: flutter_app_storj_uploader/build/app/outputs/flutter-apk/app-*-release.apk
           retention-days: 30
