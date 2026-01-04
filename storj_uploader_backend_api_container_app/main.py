@@ -586,8 +586,13 @@ def _trigger_storj_processor():
         return False, "STORJ_CONTAINER_URL not set"
     try:
         req = urllib_request.Request(url, method="POST")
+<<<<<<< HEAD
         # KEDA HTTP scaler can take 30-60 seconds to spin up a replica from 0; allow 90s timeout
         with urllib_request.urlopen(req, timeout=90) as resp:
+=======
+        # KEDA HTTP scaler can take a few seconds to spin up a replica; allow a longer timeout
+        with urllib_request.urlopen(req, timeout=20) as resp:
+>>>>>>> remotes/origin/claude/android-mobile-compatibility-XDY7B
             _ = resp.read()
         print(f"Triggered Storj processor via HTTP: {url}")
         return True, "triggered"
