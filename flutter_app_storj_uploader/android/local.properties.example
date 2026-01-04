@@ -1,0 +1,18 @@
+# This file contains local Flutter SDK path configuration
+# Copy this file to local.properties and configure your Flutter SDK path
+#
+# Example:
+# flutter.sdk=/path/to/flutter
+#
+# For Windows:
+# flutter.sdk=C:\\Users\\YourName\\flutter
+#
+# For macOS/Linux:
+# flutter.sdk=/Users/YourName/flutter
+# flutter.sdk=/home/username/flutter
+
+# Flutter SDK path (set by flutter command)
+# flutter.sdk=/path/to/flutter
+
+# Android SDK path (optional, usually auto-detected)
+# sdk.dir=/path/to/android-sdk

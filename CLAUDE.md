@@ -8,8 +8,9 @@ This is a **Storj file uploader system** with four main components:
 
 1. **storj_container_app** - Core Python uploader using rclone
 2. **storj_uploader_backend_api_container_app** - FastAPI backend with OpenAPI v3
-3. **storj_uploader_frontend_container_app** - React + TypeScript frontend
-4. **android_storj_uploader** - Kotlin Android mobile app
+3. **storj_uploader_frontend_container_app** - React + TypeScript frontend (Web)
+4. **flutter_app_storj_uploader** - Flutter cross-platform app (Web + Android)
+5. **android_storj_uploader** - Kotlin Android native app (legacy)
 
 The system allows users to upload files (images, videos, documents, etc.) through web and mobile interfaces, which are then automatically uploaded to Storj cloud storage with intelligent deduplication and parallel processing.
 
@@ -18,10 +19,10 @@ The system allows users to upload files (images, videos, documents, etc.) throug
 ### Data Flow
 
 ```
-Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
+Frontend (React/Flutter) / Mobile App (Flutter/Kotlin) → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
 ```
 
-1. **Frontend/Android** sends files via POST to backend API endpoints
+1. **Frontend/Mobile** sends files via POST to backend API endpoints
 2. **Backend** validates files, saves to `temp/`, moves to `../storj_container_app/upload_target/`
 3. **Auto-trigger**: When ≥5 files accumulate, backend automatically calls storj_uploader.py
 4. **Storj Container App** uses rclone to upload to Storj with hash-based deduplication
@@ -442,5 +443,6 @@ All endpoints have:
 - `android_storj_uploader/README.md` - Android app setup (Windows 専用手順)
 - `android_storj_uploader/SCREEN_DESIGN.md` - 画面設計書・画面遷移図
 - `android_storj_uploader/RELEASE.md` - リリースビルドとデプロイ
-- `.devcontainer/README.md` - Dev Container setup guide
-- `.github/workflows/android-build.yml` - CI/CD configuration
+- `.devcontainer/README.md` - Dev Container setup guide (Flutter/Android SDK included)
+- `.github/workflows/flutter-android-build.yml` - Flutter Android CI/CD configuration
+- `.github/workflows/android-build.yml` - Kotlin Android CI/CD configuration

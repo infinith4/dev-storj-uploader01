@@ -25,7 +25,11 @@
         "openai.chatgpt",
         "ms-azuretools.vscode-bicep",
         "ms-vscode.azurecli",
-        "GitHub.vscode-github-actions"
+        "GitHub.vscode-github-actions",
+        "Dart-Code.dart-code",
+        "Dart-Code.flutter",
+        "alexisvt.flutter-snippets",
+        "Nash.awesome-flutter-snippets"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -35,11 +39,22 @@
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.organizeImports": "explicit"
+        },
+        "dart.flutterSdkPath": "/home/vscode/flutter",
+        "[dart]": {
+          "editor.formatOnSave": true,
+          "editor.formatOnType": true,
+          "editor.rulers": [80],
+          "editor.selectionHighlight": false,
+          "editor.suggest.snippetsPreventQuickSuggestions": false,
+          "editor.suggestSelection": "first",
+          "editor.tabCompletion": "onlySnippets",
+          "editor.wordBasedSuggestions": "off"
         }
       }
     }
   },
-  "forwardPorts": [8010, 9010, 3000],
+  "forwardPorts": [8010, 9010, 3000, 8080],
   "portsAttributes": {
     "8010": {
       "label": "Backend API",
@@ -51,6 +66,10 @@
     },
     "3000": {
       "label": "Frontend (Development)",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Flutter Web Dev Server",
       "onAutoForward": "notify"
     }
   },
