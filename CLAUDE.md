@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Storj file uploader system** with four main components:
-
+This is a **Storj file uploader system** with five main components:
 1. **storj_container_app** - Core Python uploader using rclone
 2. **storj_uploader_backend_api_container_app** - FastAPI backend with OpenAPI v3
-3. **storj_uploader_frontend_container_app** - React + TypeScript frontend
-4. **android_storj_uploader** - Kotlin Android mobile app
+3. **storj_uploader_frontend_container_app** - React + TypeScript frontend (Web)
+4. **flutter_app_storj_uploader** - Flutter cross-platform app (Web + Android)
+5. **android_storj_uploader** - Kotlin Android native app (legacy)
 
 The system allows users to upload files (images, videos, documents, etc.) through web and mobile interfaces, which are then automatically uploaded to Storj cloud storage with intelligent deduplication and parallel processing.
 
@@ -18,10 +18,10 @@ The system allows users to upload files (images, videos, documents, etc.) throug
 ### Data Flow
 
 ```
-Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
+Frontend (React/Flutter) / Mobile App (Flutter/Kotlin) → Backend API (FastAPI) → Storj Container App (rclone) → Storj Cloud
 ```
 
-1. **Frontend/Android** sends files via POST to backend API endpoints
+1. **Frontend/Mobile** sends files via POST to backend API endpoints
 2. **Backend** validates files, saves to `temp/`, moves to `../storj_container_app/upload_target/`
 3. **Auto-trigger**: When ≥5 files accumulate, backend automatically calls storj_uploader.py
 4. **Storj Container App** uses rclone to upload to Storj with hash-based deduplication
@@ -77,8 +77,39 @@ Frontend (React) / Android App → Backend API (FastAPI) → Storj Container App
 - **Styling**: Tailwind CSS with mobile-first responsive design
 - **Default port**: 9010 (production), 3000 (dev)
 
-#### android_storj_uploader (Kotlin Android)
+#### flutter_app_storj_uploader (Flutter - Web + Android)
+- **Main files**:
+  - `main.dart` - App entry point with Material Design 3
+  - `screens/home_screen.dart` - Main upload interface
+  - `widgets/file_upload_area.dart` - Cross-platform file selection (drag & drop on Web, picker on Android)
+  - `services/api_service.dart` - Dio HTTP client with error handling
+  - `services/file_service.dart` - Cross-platform file handling
+  - `models/api_models.dart` - API response models
+- **Key features**:
+  - **Cross-platform**: Web and Android support from single codebase
+  - File picker with camera/gallery integration on Android
+  - Drag & drop file upload on Web (using `flutter_dropzone`)
+  - Conditional imports for web-only packages
+  - Riverpod state management
+  - Material Design 3 with light/dark theme
+  - Auto-upload queue management
+- **Configuration**:
+  - `.env` file for API URL (supports Azure Container Apps)
+  - Environment variables loaded via `flutter_dotenv`
+  - Same API URL for both Web and Android builds
+- **Android requirements**:
+  - minSdkVersion: 24 (Android 7.0)
+  - compileSdkVersion: 35 (Android 15)
+  - targetSdkVersion: 35 (Android 15)
+  - Kotlin: 2.0.21
+  - Android Gradle Plugin: 8.7.3
+  - Java: 17
+  - Permissions: Internet, Storage, Camera, Media (including Android 14+ partial access)
+- **Deployment**:
+  - Web: Docker with nginx (deployed to Azure Container Apps)
+  - Android: APK build via `flutter build apk`
 
+#### android_storj_uploader (Kotlin Android - Legacy)
 - **Main activities**:
   - `MainActivity.kt` - Photo grid view with upload status
   - `SettingsActivity.kt` - Upload list and manual trigger
@@ -191,10 +222,84 @@ docker rmi storj_container_app-storj_container_app
 docker-compose up
 ```
 
-### Android App Development
+### Flutter App Development (Web + Android)
 
-**Windows 環境でのビルド:**
+**開発サーバーの起動:**
+```bash
+cd flutter_app_storj_uploader
 
+# Install dependencies
+flutter pub get
+
+# Run on Web
+flutter run -d web-server --web-port 8080
+# または
+flutter run -d chrome
+
+# Run on Android (emulator or device)
+flutter run -d android
+```
+
+**Android APKビルド（簡単な方法）:**
+```bash
+cd flutter_app_storj_uploader
+
+# Linux/Mac
+./build_android.sh                 # Debug APK
+./build_android.sh --release       # Release APK
+./build_android.sh --release --split-per-abi  # ABI別にビルド
+
+# Windows
+build_android.bat                  # Debug APK
+build_android.bat --release        # Release APK
+build_android.bat --release --split-per-abi
+```
+
+**Android APKビルド（手動）:**
+```bash
+cd flutter_app_storj_uploader
+
+# Debug APK
+flutter build apk --debug
+
+# Release APK
+flutter build apk --release
+
+# Release APK with ABI splits (推奨)
+flutter build apk --release --split-per-abi
+
+# Install on connected device
+flutter install
+
+# APK location:
+# build/app/outputs/flutter-apk/app-debug.apk
+# build/app/outputs/flutter-apk/app-release.apk
+# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk (ABI splits)
+```
+
+**Android Studioでの開発:**
+```bash
+# Android Studioで flutter_app_storj_uploader/android/ を開く
+# または、プロジェクトルートで:
+flutter pub get
+# その後 Android Studio から Run/Debug
+```
+
+**GitHub Actionsでの自動ビルド:**
+- ワークフロー: `.github/workflows/flutter-android-build.yml`
+- トリガー: main/develop/claude/** ブランチへのプッシュ、PRの作成
+- リリース: `flutter-v*` タグをプッシュすると自動的にGitHub Releaseが作成される
+
+```bash
+# Release作成例
+git tag flutter-v1.0.0
+git push origin flutter-v1.0.0
+# GitHub Actionsが自動的にAPKをビルドしてReleaseに添付
+```
+
+### Android App Development (Kotlin Native - Legacy)
+
+**Windows環境でのビルド:**
 ```cmd
 cd android_storj_uploader
 
@@ -428,8 +533,17 @@ All endpoints have:
 
 ## GitHub Actions CI/CD
 
-### Android App
+### Flutter Android App
+- **Workflow**: `.github/workflows/flutter-android-build.yml`
+- **Triggers**: Push/PR to main/develop/claude/** branches, tag push, manual dispatch
+- **Tasks**:
+  - Build debug/release APK with ABI splits
+  - Run `flutter analyze` and `flutter test`
+  - Code quality checks (`flutter format`)
+- **Release**: Tag push (e.g., `flutter-v1.0.0`) creates GitHub Release with APKs
+- **Artifacts**: Debug APK, Release APK, Split APKs (arm64-v8a, armeabi-v7a, x86_64)
 
+### Android App (Kotlin Native - Legacy)
 - **Workflow**: `.github/workflows/android-build.yml`
 - **Triggers**: Push/PR to any branch, tag push
 - **Tasks**: Build debug APK, run tests, lint check
@@ -439,8 +553,12 @@ All endpoints have:
 
 ## Documentation Files
 
-- `android_storj_uploader/README.md` - Android app setup (Windows 専用手順)
+- `flutter_app_storj_uploader/README.md` - Flutter app setup and development (Web + Android)
+- `flutter_app_storj_uploader/build_android.sh` - Android build script for Linux/Mac
+- `flutter_app_storj_uploader/build_android.bat` - Android build script for Windows
+- `android_storj_uploader/README.md` - Android app setup (Windows専用手順)
 - `android_storj_uploader/SCREEN_DESIGN.md` - 画面設計書・画面遷移図
 - `android_storj_uploader/RELEASE.md` - リリースビルドとデプロイ
-- `.devcontainer/README.md` - Dev Container setup guide
-- `.github/workflows/android-build.yml` - CI/CD configuration
+- `.devcontainer/README.md` - Dev Container setup guide (Flutter/Android SDK included)
+- `.github/workflows/flutter-android-build.yml` - Flutter Android CI/CD configuration
+- `.github/workflows/android-build.yml` - Kotlin Android CI/CD configuration

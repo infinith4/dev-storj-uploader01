@@ -26,10 +26,93 @@ Flutter web application that provides a user-friendly interface for uploading fi
 # Install dependencies
 flutter pub get
 
-# Run in debug mode
+# Run on Web
 flutter run -d web-server --web-port 8080
 
+# Run on Android (emulator or connected device)
+flutter run -d android
+
+# Run on Chrome browser
+flutter run -d chrome
 ```
+
+### Android Development with Android Studio
+
+You can open and develop the Android part of this Flutter project directly in Android Studio:
+
+1. **Open in Android Studio**:
+   - Launch Android Studio
+   - Select "Open an Existing Project"
+   - Navigate to `flutter_app_storj_uploader/android/` and open it
+   - Android Studio will sync Gradle automatically
+
+2. **Run/Debug from Android Studio**:
+   - Select your device/emulator from the device dropdown
+   - Click the Run button (▶) or Debug button (🐛)
+   - The app will build and launch
+
+3. **Edit Native Android Code**:
+   - Open `app/src/main/kotlin/com/example/storj_uploader_flutter/MainActivity.kt`
+   - You can add native Android features using platform channels
+
+4. **Gradle Tasks**:
+   - Right-click on the project → Tasks → build → assembleDebug
+   - Or use Terminal in Android Studio: `./gradlew assembleDebug`
+
+### Android APK Build (Command Line)
+
+**Quick Build (Using Build Scripts):**
+
+```bash
+# Linux/Mac
+./build_android.sh                 # Build debug APK
+./build_android.sh --release       # Build release APK
+./build_android.sh --release --split-per-abi  # Build with ABI splits
+./build_android.sh --help          # Show all options
+
+# Windows
+build_android.bat                  # Build debug APK
+build_android.bat --release        # Build release APK
+build_android.bat --release --split-per-abi
+```
+
+**Manual Build:**
+
+```bash
+# Debug APK
+flutter build apk --debug
+
+# Release APK (requires signing config)
+flutter build apk --release
+
+# Release APK with ABI splits (recommended for production)
+flutter build apk --release --split-per-abi
+
+# APK output location:
+# build/app/outputs/flutter-apk/app-debug.apk
+# build/app/outputs/flutter-apk/app-release.apk
+# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+# build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+# Install on connected device
+flutter install
+
+# Or use Gradle directly from android directory:
+cd android
+./gradlew assembleDebug        # Linux/Mac
+gradlew.bat assembleDebug      # Windows
+```
+
+**Note**: For Android builds, you need to have Android SDK installed. The app requires:
+- minSdkVersion: 24 (Android 7.0)
+- compileSdkVersion: 35 (Android 15)
+- targetSdkVersion: 35 (Android 15)
+- Kotlin: 2.0.21
+- Android Gradle Plugin: 8.7.3
+- Java: 17
+
+**Android Azure Connection**: The `.env` file is automatically included in the Android build, so the same Azure Backend URL configured for Web will be used for Android as well.
 
 ### Production (Docker)
 
@@ -268,3 +351,71 @@ RUN flutter build web --release
 ```
 
 Or set the API URL at runtime using environment variables in the Container App configuration.
+
+## CI/CD with GitHub Actions
+
+This repository includes automated build workflows for Flutter Android:
+
+### Workflow: Flutter Android CI/CD
+
+**File**: `.github/workflows/flutter-android-build.yml`
+
+**Triggers**:
+- Push to `main`, `master`, `develop`, or `claude/**` branches
+- Pull requests to `main`, `master`, or `develop` branches
+- Manual workflow dispatch
+
+**Jobs**:
+
+1. **build-android**: Builds Flutter Android APKs
+   - Runs on every push/PR
+   - Outputs:
+     - Debug APK: `flutter-app-debug`
+     - Release APK: `flutter-app-release`
+     - Split APKs: `flutter-app-release-split` (arm64-v8a, armeabi-v7a, x86_64)
+   - Also runs `flutter analyze` and `flutter test`
+
+2. **release**: Creates GitHub Release
+   - Runs only on tag push matching `flutter-v*` (e.g., `flutter-v1.0.0`)
+   - Uploads split APKs to GitHub Release
+   - Generates release notes with installation instructions
+
+3. **quality**: Code quality checks
+   - Runs `flutter analyze` and `flutter format`
+   - Uploads analysis reports as artifacts
+
+### Creating a Release
+
+To create a new Flutter Android release:
+
+```bash
+# Tag the current commit
+git tag flutter-v1.0.0
+git push origin flutter-v1.0.0
+
+# GitHub Actions will automatically:
+# 1. Build release APKs with ABI splits
+# 2. Create a GitHub Release
+# 3. Upload APKs to the release
+```
+
+### Downloading Build Artifacts
+
+After a successful build, you can download the APK artifacts from:
+- GitHub Actions → Select workflow run → Artifacts section
+- Or from the GitHub Release page (for tagged releases)
+
+### Local Testing Before Release
+
+Before creating a release tag, test the build locally:
+
+```bash
+# Use the build script
+./build_android.sh --release --split-per-abi
+
+# Or use Flutter directly
+flutter build apk --release --split-per-abi
+
+# Test the APK on a device
+adb install build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```

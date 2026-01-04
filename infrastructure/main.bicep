@@ -87,6 +87,7 @@ param hashLength int = 10
 @description('Max workers for parallel upload')
 param maxWorkers int = 8
 
+<<<<<<< HEAD
 @description('Backend container vCPU (e.g., 0.5, 1.0)')
 param backendCpu string = '0.5'
 
@@ -111,6 +112,8 @@ param storjCpu string = '0.5'
 @description('Storj uploader container memory (e.g., 1.0Gi)')
 param storjMemory string = '1.0Gi'
 
+=======
+>>>>>>> remotes/origin/claude/android-mobile-compatibility-XDY7B
 @description('Deploy Azure CDN (Standard_Microsoft) to cache public assets')
 param deployCdn bool = true
 
